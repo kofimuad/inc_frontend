@@ -17,19 +17,21 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
     const [stage, setStage] = useState<Stage>('shipped');
     const [file, setFile] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [result, setResult] = useState<{ 
-        updated: number; 
-        added?: number; 
-        held?: number; 
-        failed: number; 
+    const [result, setResult] = useState<{
+        updated: number;
+        added?: number;
+        held?: number;
+        skipped: number;
     } | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [isDuplicate, setIsDuplicate] = useState(false);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setFile(e.target.files[0]);
             setError(null);
             setResult(null);
+            setIsDuplicate(false);
         }
     };
 
@@ -53,18 +55,26 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
             }
 
             console.log("Upload result:", data);
+            const batch = data?.batch;
             setResult({
-                updated: data?.updatedCount || data?.processedCount || 0,
-                added: data?.addedCount,
-                held: data?.heldCount,
-                failed: data?.failedCount || 0
+                updated: batch?.matchedItems ?? 0,
+                added:   batch?.newItems,
+                held:    batch?.heldItems,
+                skipped: data?.skippedRows?.length ?? 0,
             });
             onSuccess();
         } catch (err: any) {
             console.error("Bulk upload error details:", err.response?.data);
             const serverData = err.response?.data;
+            const statusCode = err.response?.status;
+
+            if (statusCode === 409) {
+                setIsDuplicate(true);
+                setError(serverData?.message || "This file has already been uploaded.");
+                return;
+            }
+
             let message = "Failed to process batch upload. Please check your Excel format.";
-            
             if (typeof serverData === 'string') {
                 message = serverData;
             } else if (serverData?.message) {
@@ -74,7 +84,6 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
             } else if (Array.isArray(serverData)) {
                 message = serverData.join(', ');
             }
-            
             setError(message);
         } finally {
             setIsLoading(false);
@@ -109,7 +118,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                             ].map((s) => (
                                 <button
                                     key={s.id}
-                                    onClick={() => { setStage(s.id as Stage); setFile(null); setResult(null); }}
+                                    onClick={() => { setStage(s.id as Stage); setFile(null); setResult(null); setError(null); setIsDuplicate(false); }}
                                     className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-1 ${
                                         stage === s.id 
                                         ? "border-[#039B81] bg-[#039B81]/5 text-[#039B81]" 
@@ -184,9 +193,9 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                             <div className="flex flex-wrap justify-center gap-8 mt-6">
                                 <div>
                                     <p className="text-3xl font-black text-emerald-700">{result.updated}</p>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600/60 mt-1">Processed</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600/60 mt-1">Updated</p>
                                 </div>
-                                {result.added !== undefined && result.added > 0 && (
+                                {result.added !== undefined && (
                                     <div>
                                         <p className="text-3xl font-black text-emerald-600">{result.added}</p>
                                         <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600/60 mt-1">New Items</p>
@@ -198,17 +207,27 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                                         <p className="text-[10px] font-black uppercase tracking-widest text-amber-500/60 mt-1">On Hold</p>
                                     </div>
                                 )}
-                                {result.failed > 0 && (
+                                {result.skipped > 0 && (
                                     <div>
-                                        <p className="text-3xl font-black text-red-500">{result.failed}</p>
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-red-500/60 mt-1">Errors</p>
+                                        <p className="text-3xl font-black text-slate-400">{result.skipped}</p>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400/60 mt-1">Skipped</p>
                                     </div>
                                 )}
                             </div>
                         </div>
                     )}
 
-                    {error && (
+                    {isDuplicate && error && (
+                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex gap-3">
+                            <Info className="text-amber-500 shrink-0 mt-0.5" size={20} />
+                            <div>
+                                <p className="text-xs font-black text-amber-800 uppercase tracking-widest mb-1">Already Uploaded</p>
+                                <p className="text-xs text-amber-700 font-bold leading-relaxed">{error}</p>
+                                <p className="text-[10px] text-amber-600 mt-2">Select a different file or choose a different stage.</p>
+                            </div>
+                        </div>
+                    )}
+                    {!isDuplicate && error && (
                         <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex gap-3">
                             <AlertCircle className="text-red-500 shrink-0" size={20} />
                             <p className="text-xs text-red-700 font-bold leading-relaxed">{error}</p>
