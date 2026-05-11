@@ -87,11 +87,14 @@ export default function EmployeeDashboard() {
                 getBatchShipments({ limit: 1, status: 'delivered' })
             ]);
 
+            const totalBatch = allBatch?.pagination?.total || 0;
+            const deliveredBatchCount = deliveredBatch?.pagination?.total || 0;
+
             setStats({
-                activeShipments: (coreStats?.activeShipments || 0) + (allBatch?.pagination?.total || 0),
+                activeShipments: (coreStats?.activeShipments || 0) + Math.max(0, totalBatch - deliveredBatchCount),
                 pendingUpdates: (coreStats?.pendingUpdates || 0) + (pendingBatch?.pagination?.total || 0),
-                heldShipments: onHoldBatch?.pagination?.total || 0,
-                completedToday: (coreStats?.completedToday || 0) + (deliveredBatch?.pagination?.total || 0)
+                heldShipments: (coreStats?.heldShipments || 0) + (onHoldBatch?.pagination?.total || 0),
+                completedToday: coreStats?.completedToday || 0,
             });
         } catch (error) {
             console.error("Failed to fetch stats:", error);

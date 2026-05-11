@@ -13,6 +13,7 @@ interface UpdateStatusModalProps {
 const STATUS_OPTIONS = [
     { value: "pending", label: "Pending" },
     { value: "picked_up", label: "Picked Up" },
+    { value: "on_hold", label: "On Hold" },
     { value: "in_transit", label: "In Transit" },
     { value: "customs", label: "Customs" },
     { value: "out_for_delivery", label: "Out for Delivery" },
