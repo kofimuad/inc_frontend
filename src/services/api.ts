@@ -25,6 +25,23 @@ export const getAccessToken = (): string | null => {
     return getStoredToken();
 };
 
+// Decode JWT exp claim without verifying signature (client-side only)
+function getTokenExpiry(token: string): number | null {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return typeof payload.exp === 'number' ? payload.exp : null;
+    } catch {
+        return null;
+    }
+}
+
+// Returns true if the token is expired or will expire within bufferSeconds
+function isTokenExpiredOrExpiringSoon(token: string, bufferSeconds = 60): boolean {
+    const exp = getTokenExpiry(token);
+    if (!exp) return false;
+    return Date.now() / 1000 >= exp - bufferSeconds;
+}
+
 const api = axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_URL,
     withCredentials: true, // Crucial for sending httpOnly refresh cookies
@@ -48,81 +65,96 @@ const processQueue = (error: any, token: string | null = null) => {
     failedQueue = [];
 };
 
-// Request interceptor to attach access token
+async function doRefresh(): Promise<string> {
+    const response = await axios.post(
+        `${api.defaults.baseURL}/api/auth/refresh`,
+        {},
+        { withCredentials: true }
+    );
+    const newToken = response.data?.data?.accessToken || response.data?.accessToken;
+    if (!newToken) throw new Error("No token received from refresh endpoint");
+    setAccessToken(newToken);
+    return newToken;
+}
+
+// Request interceptor — proactively refresh if the token is expired/expiring soon
+// so requests never hit the server with a stale token.
 api.interceptors.request.use(
-    (config: InternalAxiosRequestConfig) => {
-        const token = getAccessToken();
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+    async (config: InternalAxiosRequestConfig) => {
+        // Skip refresh logic for the auth endpoints themselves
+        const url = config.url ?? '';
+        const isAuthEndpoint = url.includes('/api/auth/refresh') || url.includes('/api/auth/login');
+
+        if (!isAuthEndpoint) {
+            let token = getAccessToken();
+
+            if (token && isTokenExpiredOrExpiringSoon(token)) {
+                if (isRefreshing) {
+                    // Another request is already refreshing — wait for it
+                    token = await new Promise<string>((resolve, reject) => {
+                        failedQueue.push({ resolve, reject });
+                    });
+                } else {
+                    isRefreshing = true;
+                    try {
+                        token = await doRefresh();
+                        processQueue(null, token);
+                    } catch (err) {
+                        processQueue(err, null);
+                        setAccessToken(null);
+                        token = null;
+                    } finally {
+                        isRefreshing = false;
+                    }
+                }
+            }
+
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
         }
 
-        // Fix for multipart/form-data: remove default application/json if sending FormData
-        // This allows the browser to set the correct Content-Type with the boundary
+        // Fix for multipart/form-data: let the browser set Content-Type with boundary
         if (config.data instanceof FormData) {
             delete config.headers["Content-Type"];
         }
 
-        // Debug: log requests without tokens to protected endpoints
-        if (!token && config.url && (config.url.includes('/api/shipments') || config.url.includes('/api/admin') || config.url.includes('/api/dashboard'))) {
-            console.warn('⚠️ Request to protected endpoint without token:', config.url);
-        }
         return config;
     },
-    (error) => {
-        return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle 401 Unauthorized errors and automatically refresh
+// Response interceptor — last-resort 401 handler for edge cases the request
+// interceptor couldn't catch (e.g. clock skew, server-side token invalidation).
 api.interceptors.response.use(
     (response) => response,
     async (error: AxiosError) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-        // If error is 401, we haven't retried yet, and it's not a request to login/refresh itself
-        if (error.response?.status === 401 && !originalRequest._retry && originalRequest.url !== '/api/auth/login' && originalRequest.url !== '/api/auth/refresh') {
-            
+        const isAuthEndpoint = originalRequest?.url?.includes('/api/auth/login') ||
+                               originalRequest?.url?.includes('/api/auth/refresh');
+
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
             if (isRefreshing) {
-                // If already refreshing, put the request in a queue to wait
-                return new Promise(function(resolve, reject) {
+                return new Promise<string>((resolve, reject) => {
                     failedQueue.push({ resolve, reject });
                 }).then(token => {
                     originalRequest.headers.Authorization = 'Bearer ' + token;
                     return api(originalRequest);
-                }).catch(err => {
-                    return Promise.reject(err);
-                });
+                }).catch(err => Promise.reject(err));
             }
 
             originalRequest._retry = true;
             isRefreshing = true;
 
             try {
-                // Manually call refresh endpoint using standard axios to bypass interceptors
-                // The refresh token is automatically sent as an httpOnly cookie via withCredentials
-                const response = await axios.post(
-                    `${api.defaults.baseURL}/api/auth/refresh`,
-                    {},
-                    { withCredentials: true }
-                );
-                
-                // Backend returns { success, message, data: { accessToken } }
-                const newToken = response.data?.data?.accessToken || response.data?.accessToken;
-                
-                if (newToken) {
-                    setAccessToken(newToken);
-                    originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                    processQueue(null, newToken);
-                    // Re-dispatch original request
-                    return api(originalRequest);
-                } else {
-                    throw new Error("No token received from refresh endpoint");
-                }
+                const newToken = await doRefresh();
+                processQueue(null, newToken);
+                originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                return api(originalRequest);
             } catch (refreshError) {
                 processQueue(refreshError, null);
                 setAccessToken(null);
-                // We do NOT forcefully redirect here, because public pages might trigger 401 on /me.
-                // The AuthContext will catch the failed /me call and set user state to logged out.
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;
@@ -132,12 +164,6 @@ api.interceptors.response.use(
         if (error.response?.status === 500) {
             console.error("API 500 Error Body:", error.response.data);
             console.error("API 500 Request URL:", originalRequest?.url);
-        }
-
-        // Silent 401 for /me — unexpected auth failure on a known protected route 
-        // that will be handled by ProtectedRoute component
-        if (error.response?.status === 401 && originalRequest?.url?.includes('/api/auth/me')) {
-            return Promise.reject(error);
         }
 
         return Promise.reject(error);
