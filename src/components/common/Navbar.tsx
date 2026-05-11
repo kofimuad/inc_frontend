@@ -9,6 +9,7 @@ import { Menu, X, ArrowUpRight, Globe, TrendingUp } from "lucide-react";
 const navLinks = [
     { name: "Home", href: "/" },
     { name: "About", href: "/about" },
+    { name: "Container Loadings", href: "/container-loadings" },
     { name: "Shipping Address", href: "/address" },
     { name: "Contact", href: "/contact" },
 ];
