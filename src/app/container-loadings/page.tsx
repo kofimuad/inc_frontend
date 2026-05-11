@@ -2,253 +2,405 @@
 
 import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
-import { Ship, Calendar, Clock, Package, CheckCircle, Search, Loader2 } from "lucide-react";
-import { Suspense, useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
-import { getBatchShipments } from "@/services/shipments";
+import { Ship, Anchor, Package, Search, Loader2, ChevronDown, ChevronUp, MapPin, Clock } from "lucide-react";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import {
+    listContainerLoadings,
+    searchContainerLoadings,
+    getContainerLoading,
+    type ContainerLoading,
+    type ContainerItem,
+} from "@/services/containerLoadings";
 
-interface ContainerGroup {
-    containerRef: string;
-    itemCount: number;
-    statuses: Record<string, number>;
-    latestDate: string;
-    descriptions: string[];
-    primaryStatus: string;
-}
+// ─── Status helpers ───────────────────────────────────────────────────────────
 
-function groupByContainer(items: any[]): ContainerGroup[] {
-    const map = new Map<string, ContainerGroup>();
+const STATUS_META: Record<string, { label: string; classes: string; dot: string }> = {
+    loading: { label: "Loading",            classes: "bg-yellow-100 text-yellow-700",  dot: "bg-yellow-500" },
+    shipped: { label: "Shipped",            classes: "bg-blue-100 text-blue-700",      dot: "bg-blue-500" },
+    arrived: { label: "Arrived",            classes: "bg-emerald-100 text-emerald-700",dot: "bg-emerald-500" },
+    ready:   { label: "Ready for Pickup",   classes: "bg-[#039B81]/10 text-[#039B81]", dot: "bg-[#039B81]" },
+};
 
-    for (const item of items) {
-        const ref = item.containerRef || 'Unassigned';
-        if (!map.has(ref)) {
-            map.set(ref, {
-                containerRef: ref,
-                itemCount: 0,
-                statuses: {},
-                latestDate: item.createdAt || '',
-                descriptions: [],
-                primaryStatus: item.status || 'pending',
-            });
-        }
-        const group = map.get(ref)!;
-        group.itemCount += item.itemsCount || item.quantity || 1;
-        group.statuses[item.status] = (group.statuses[item.status] || 0) + 1;
-
-        if (item.createdAt && item.createdAt > group.latestDate) {
-            group.latestDate = item.createdAt;
-        }
-
-        const desc = item.productDescription || item.description;
-        if (desc && !group.descriptions.includes(desc)) {
-            group.descriptions.push(desc);
-        }
-    }
-
-    // Determine the primary (dominant) status per group
-    for (const group of map.values()) {
-        const sorted = Object.entries(group.statuses).sort((a, b) => b[1] - a[1]);
-        group.primaryStatus = sorted[0]?.[0] || 'pending';
-    }
-
-    return Array.from(map.values()).sort(
-        (a, b) => new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime()
+function StatusBadge({ status }: { status: string }) {
+    const meta = STATUS_META[status] || { label: status.toUpperCase(), classes: "bg-slate-100 text-slate-600", dot: "bg-slate-400" };
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${meta.classes}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+            {meta.label}
+        </span>
     );
 }
 
-function getStatusLabel(status: string): string {
-    const labels: Record<string, string> = {
-        pending: 'INTAKE',
-        on_hold: 'ON HOLD',
-        in_transit: 'IN TRANSIT',
-        delivered: 'ARRIVED',
-        customs: 'CUSTOMS',
+function ItemStatusBadge({ status }: { status: string }) {
+    const colors: Record<string, string> = {
+        in_warehouse: "bg-yellow-50 text-yellow-600",
+        shipped:      "bg-blue-50 text-blue-600",
+        arrived:      "bg-emerald-50 text-emerald-600",
+        delivered:    "bg-[#039B81]/10 text-[#039B81]",
+        held:         "bg-red-50 text-red-500",
     };
-    return labels[status] || status.replace(/_/g, ' ').toUpperCase();
+    return (
+        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${colors[status] || "bg-slate-100 text-slate-500"}`}>
+            {status.replace(/_/g, " ")}
+        </span>
+    );
 }
 
-function getStatusClasses(status: string): string {
-    const map: Record<string, string> = {
-        pending: 'bg-yellow-100 text-yellow-700',
-        on_hold: 'bg-teal-100 text-teal-700',
-        in_transit: 'bg-blue-100 text-blue-700',
-        delivered: 'bg-green-100 text-green-700',
-        customs: 'bg-purple-100 text-purple-700',
-    };
-    return map[status] || 'bg-slate-100 text-slate-700';
+function formatDate(dateStr?: string) {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
+
+// ─── Container card with expandable items ─────────────────────────────────────
+
+function ContainerCard({ container }: { container: ContainerLoading }) {
+    const [expanded, setExpanded] = useState(false);
+    const [items, setItems]       = useState<ContainerItem[]>([]);
+    const [loadingItems, setLoadingItems] = useState(false);
+
+    const toggleExpand = async () => {
+        if (!expanded && items.length === 0) {
+            setLoadingItems(true);
+            try {
+                const result = await getContainerLoading(container._id);
+                setItems(result.items);
+            } catch {
+                setItems([]);
+            } finally {
+                setLoadingItems(false);
+            }
+        }
+        setExpanded((v) => !v);
+    };
+
+    return (
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-all overflow-hidden">
+            {/* Card header — always visible */}
+            <button
+                onClick={toggleExpand}
+                className="w-full text-left p-6 group"
+                aria-expanded={expanded}
+            >
+                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                    {/* Icon */}
+                    <div className="hidden sm:flex shrink-0 w-14 h-14 bg-[#039B81]/10 rounded-2xl items-center justify-center group-hover:scale-105 transition-transform duration-300">
+                        <Ship className="text-[#039B81]" size={26} />
+                    </div>
+
+                    {/* Main info */}
+                    <div className="flex-grow min-w-0">
+                        <div className="flex flex-wrap items-center gap-3 mb-3">
+                            <h3 className="text-xl font-black text-slate-800 tracking-tight truncate">
+                                {container.containerNumber}
+                            </h3>
+                            <StatusBadge status={container.status} />
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 text-sm">
+                            {container.vesselName && (
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Vessel</p>
+                                    <p className="font-bold text-slate-700 truncate">{container.vesselName}</p>
+                                </div>
+                            )}
+                            {container.volume && (
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Volume</p>
+                                    <p className="font-bold text-slate-700">{container.volume}</p>
+                                </div>
+                            )}
+                            <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ETD</p>
+                                <p className="font-bold text-slate-700">{formatDate(container.etd)}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ETA</p>
+                                <p className="font-bold text-slate-700">{formatDate(container.eta)}</p>
+                            </div>
+                        </div>
+
+                        {/* Route */}
+                        <div className="flex items-center gap-2 mt-3 text-xs text-slate-500 font-medium">
+                            <MapPin size={12} className="text-slate-300" />
+                            <span>{container.portOfLoading}</span>
+                            <span className="text-slate-300">→</span>
+                            <span>{container.portOfDischarge}</span>
+                        </div>
+
+                        {container.notes && (
+                            <p className="mt-2 text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg font-medium">
+                                {container.notes}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Expand toggle */}
+                    <div className="shrink-0 self-center text-slate-300 group-hover:text-[#039B81] transition-colors">
+                        {expanded ? <ChevronUp size={22} /> : <ChevronDown size={22} />}
+                    </div>
+                </div>
+            </button>
+
+            {/* Expandable items list */}
+            {expanded && (
+                <div className="border-t border-slate-100 bg-slate-50/60 px-6 py-4">
+                    {loadingItems ? (
+                        <div className="flex items-center gap-3 py-4 text-slate-400">
+                            <Loader2 className="animate-spin" size={16} />
+                            <span className="text-xs font-bold uppercase tracking-widest">Loading items...</span>
+                        </div>
+                    ) : items.length === 0 ? (
+                        <p className="text-xs text-slate-400 font-medium py-3">No items found for this container.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                                {items.length} item{items.length !== 1 ? "s" : ""} in this container
+                            </p>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs min-w-[480px]">
+                                    <thead>
+                                        <tr className="text-[10px] text-slate-400 font-black uppercase tracking-widest text-left">
+                                            <th className="pb-2 pr-4">Waybill</th>
+                                            <th className="pb-2 pr-4">Customer</th>
+                                            <th className="pb-2 pr-4">Destination</th>
+                                            <th className="pb-2 pr-4">Description</th>
+                                            <th className="pb-2 pr-4">Qty</th>
+                                            <th className="pb-2">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {items.map((item) => (
+                                            <tr key={item.waybillNo} className="hover:bg-white/70 transition-colors">
+                                                <td className="py-2 pr-4 font-black text-slate-800">{item.waybillNo}</td>
+                                                <td className="py-2 pr-4 text-slate-600 font-medium">{item.customerName || "—"}</td>
+                                                <td className="py-2 pr-4 text-slate-600">{item.destinationCity || "—"}</td>
+                                                <td className="py-2 pr-4 text-slate-500 max-w-[150px] truncate">{item.productDescription || "—"}</td>
+                                                <td className="py-2 pr-4 text-slate-600">{item.quantity ?? "—"}</td>
+                                                <td className="py-2"><ItemStatusBadge status={item.status} /></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Waybill match result card ────────────────────────────────────────────────
+
+function WaybillMatchCard({ item, container }: { item: any; container: ContainerLoading }) {
+    return (
+        <div className="bg-[#039B81]/5 border-2 border-[#039B81]/20 rounded-3xl p-6 mb-6">
+            <p className="text-[10px] font-black text-[#039B81] uppercase tracking-widest mb-3">Waybill Match Found</p>
+            <div className="flex flex-wrap items-center gap-4 mb-4">
+                <div>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Waybill</p>
+                    <p className="font-black text-slate-800 text-lg">{item.waybillNo}</p>
+                </div>
+                <div>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Customer</p>
+                    <p className="font-bold text-slate-700">{item.customerName || "—"}</p>
+                </div>
+                <div>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Destination</p>
+                    <p className="font-bold text-slate-700">{item.destinationCity || "—"}</p>
+                </div>
+                <ItemStatusBadge status={item.status} />
+            </div>
+            <div className="border-t border-[#039B81]/10 pt-4">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Container</p>
+                <div className="flex flex-wrap items-center gap-3">
+                    <span className="font-black text-slate-800">{container.containerNumber}</span>
+                    <StatusBadge status={container.status} />
+                    {container.eta && (
+                        <span className="text-xs text-slate-500 flex items-center gap-1">
+                            <Clock size={12} />
+                            ETA: {formatDate(container.eta)}
+                        </span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Main content (needs useSearchParams so must be wrapped in Suspense) ──────
 
 function ContainerLoadingsContent() {
     const searchParams = useSearchParams();
-    const query = searchParams.get("q")?.toLowerCase() || "";
+    const router = useRouter();
+    const initialQ = searchParams.get("q") || "";
 
-    const [containers, setContainers] = useState<ContainerGroup[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [searchValue, setSearchValue] = useState(query);
-    const [error, setError] = useState<string | null>(null);
+    const [searchValue, setSearchValue]   = useState(initialQ);
+    const [containers, setContainers]     = useState<ContainerLoading[]>([]);
+    const [waybillMatch, setWaybillMatch] = useState<{ item: any; container: ContainerLoading } | null>(null);
+    const [isLoading, setIsLoading]       = useState(true);
+    const [isSearching, setIsSearching]   = useState(false);
+    const [error, setError]               = useState<string | null>(null);
+    const [pagination, setPagination]     = useState<any>(null);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const fetchContainers = useCallback(async () => {
+    const loadAll = useCallback(async () => {
         setIsLoading(true);
         setError(null);
+        setWaybillMatch(null);
         try {
-            // Fetch a large batch of shipments that have container refs
-            const data = await getBatchShipments({ limit: 200 });
-            const items = data?.items || (Array.isArray(data) ? data : []);
-            // Only include items that have a container reference
-            const withContainer = items.filter((i: any) => i.containerRef);
-            setContainers(groupByContainer(withContainer));
-        } catch (err) {
-            console.error("Failed to fetch container data:", err);
+            const result = await listContainerLoadings({ limit: 50 });
+            setContainers(result.containers);
+            setPagination(result.pagination);
+        } catch {
             setError("Failed to load container data. Please try again.");
         } finally {
             setIsLoading(false);
         }
     }, []);
 
-    useEffect(() => {
-        fetchContainers();
-    }, [fetchContainers]);
+    const doSearch = useCallback(async (q: string) => {
+        if (q.length < 2) {
+            loadAll();
+            return;
+        }
+        setIsSearching(true);
+        setError(null);
+        setWaybillMatch(null);
+        try {
+            const result = await searchContainerLoadings(q);
+            setContainers(result.containers);
+            setWaybillMatch(result.waybillMatch);
+        } catch {
+            setError("Search failed. Please try again.");
+        } finally {
+            setIsSearching(false);
+        }
+    }, [loadAll]);
 
-    const filteredContainers = containers.filter((c) => {
-        if (!searchValue) return true;
-        const q = searchValue.toLowerCase();
-        return (
-            c.containerRef.toLowerCase().includes(q) ||
-            c.descriptions.some((d) => d.toLowerCase().includes(q)) ||
-            getStatusLabel(c.primaryStatus).toLowerCase().includes(q)
-        );
-    });
+    useEffect(() => {
+        if (initialQ.length >= 2) {
+            doSearch(initialQ);
+        } else {
+            loadAll();
+        }
+    }, []);
+
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const q = e.target.value;
+        setSearchValue(q);
+
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            const params = new URLSearchParams(window.location.search);
+            if (q) params.set("q", q); else params.delete("q");
+            router.replace(`/container-loadings?${params.toString()}`, { scroll: false });
+            doSearch(q.trim());
+        }, 500);
+    };
+
+    const loading = isLoading || isSearching;
 
     return (
         <main className="bg-slate-50 min-h-screen">
-            {/* Header Section */}
-            <section className="pt-32 pb-10 bg-white border-b border-slate-100">
+            {/* Hero header */}
+            <section className="pt-32 pb-12 bg-white border-b border-slate-100">
                 <div className="container mx-auto px-4 text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-[#039B81]/10 rounded-2xl mb-6 mx-auto">
+                        <Anchor className="text-[#039B81]" size={30} />
+                    </div>
                     <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight mb-4">
                         Container Loadings
                     </h1>
-                    <p className="text-slate-500 font-medium max-w-2xl mx-auto">
-                        Track the latest shipping containers and vessel departures.
+                    <p className="text-slate-500 font-medium max-w-xl mx-auto mb-8">
+                        Track shipping containers from Guangzhou to Tema Port. Search by container number or your waybill number.
                     </p>
-                </div>
-            </section>
 
-            {/* Search */}
-            <section className="py-8">
-                <div className="container mx-auto px-4 max-w-4xl">
-                    <div className="relative max-w-md mx-auto">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                    {/* Search bar */}
+                    <div className="relative max-w-lg mx-auto">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
+                        {(isSearching) && (
+                            <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 text-[#039B81] animate-spin" size={18} />
+                        )}
                         <input
                             type="text"
-                            placeholder="Search containers, descriptions..."
+                            placeholder="Container number or waybill / job number..."
                             value={searchValue}
-                            onChange={(e) => setSearchValue(e.target.value)}
-                            className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:border-[#039B81]/50 transition-all font-medium shadow-sm"
+                            onChange={handleSearchChange}
+                            className="w-full pl-12 pr-12 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:border-[#039B81]/50 transition-all font-medium shadow-sm"
                         />
+                    </div>
+
+                    {/* Status legend */}
+                    <div className="flex flex-wrap justify-center gap-3 mt-6">
+                        {Object.entries(STATUS_META).map(([key, meta]) => (
+                            <span key={key} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black tracking-widest ${meta.classes}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+                                {meta.label}
+                            </span>
+                        ))}
                     </div>
                 </div>
             </section>
 
-            {/* Loadings List Section */}
-            <section className="pb-20">
+            {/* Results */}
+            <section className="py-10 pb-24">
                 <div className="container mx-auto px-4 max-w-4xl">
-                    {isLoading ? (
-                        <div className="py-20 flex flex-col items-center gap-4 text-slate-400">
-                            <Loader2 className="animate-spin" size={32} />
-                            <span className="font-bold text-xs uppercase tracking-widest">Loading containers...</span>
+                    {loading ? (
+                        <div className="py-24 flex flex-col items-center gap-4 text-slate-400">
+                            <Loader2 className="animate-spin text-[#039B81]" size={32} />
+                            <span className="text-xs font-black uppercase tracking-widest">
+                                {isSearching ? "Searching..." : "Loading containers..."}
+                            </span>
                         </div>
                     ) : error ? (
-                        <div className="py-20 text-center">
-                            <p className="text-red-500 font-medium">{error}</p>
-                            <button onClick={fetchContainers} className="mt-4 text-[#039B81] font-bold text-sm underline">
+                        <div className="py-24 text-center">
+                            <p className="text-red-500 font-medium mb-4">{error}</p>
+                            <button onClick={loadAll} className="text-[#039B81] font-black text-sm underline">
                                 Retry
                             </button>
                         </div>
-                    ) : filteredContainers.length === 0 ? (
-                        <div className="py-20 text-center text-slate-400 font-medium tracking-widest text-sm uppercase">
-                            {searchValue ? 'No containers match your search.' : 'No container loadings found yet.'}
-                        </div>
                     ) : (
-                        <div className="flex flex-col gap-6">
-                            {filteredContainers.map((container) => (
-                                <div
-                                    key={container.containerRef}
-                                    className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all relative overflow-hidden group"
-                                >
-                                    {/* Status Badge */}
-                                    <div className={`absolute top-0 right-0 px-4 py-1.5 rounded-bl-2xl text-[10px] font-black tracking-widest uppercase ${getStatusClasses(container.primaryStatus)}`}>
-                                        {getStatusLabel(container.primaryStatus)}
-                                    </div>
+                        <>
+                            {waybillMatch && (
+                                <WaybillMatchCard item={waybillMatch.item} container={waybillMatch.container} />
+                            )}
 
-                                    <div className="flex flex-col md:flex-row gap-6">
-                                        {/* Icon Column */}
-                                        <div className="hidden md:flex flex-col items-center justify-center min-w-[80px] border-r border-slate-50 pr-6">
-                                            <div className="w-16 h-16 bg-[#039B81]/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
-                                                <Ship className="text-[#039B81]" size={32} />
-                                            </div>
-                                        </div>
-
-                                        {/* Content Column */}
-                                        <div className="flex-grow">
-                                            <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-4 pr-24">
-                                                Container {container.containerRef}
-                                            </h3>
-
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                                <div className="flex items-start gap-3">
-                                                    <Calendar className="text-slate-300 mt-0.5 shrink-0" size={18} />
-                                                    <div>
-                                                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Last Updated</p>
-                                                        <p className="text-slate-700 font-bold text-sm">
-                                                            {container.latestDate
-                                                                ? new Date(container.latestDate).toLocaleDateString('en-GB', {
-                                                                    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
-                                                                })
-                                                                : 'N/A'}
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-start gap-3">
-                                                    <Package className="text-slate-300 mt-0.5 shrink-0" size={18} />
-                                                    <div>
-                                                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Total Items</p>
-                                                        <p className="text-slate-700 font-bold text-sm">{container.itemCount} items</p>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-start gap-3">
-                                                    <CheckCircle className="text-slate-300 mt-0.5 shrink-0" size={18} />
-                                                    <div>
-                                                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Description</p>
-                                                        <p className="text-slate-600 text-sm font-medium">
-                                                            {container.descriptions.length > 0
-                                                                ? container.descriptions.slice(0, 3).join(', ')
-                                                                : 'Mixed Goods'}
-                                                            {container.descriptions.length > 3 && ` +${container.descriptions.length - 3} more`}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Status Breakdown */}
-                                            {Object.keys(container.statuses).length > 1 && (
-                                                <div className="mt-4 pt-4 border-t border-slate-50 flex flex-wrap gap-2">
-                                                    {Object.entries(container.statuses).map(([status, count]) => (
-                                                        <span
-                                                            key={status}
-                                                            className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${getStatusClasses(status)}`}
-                                                        >
-                                                            {getStatusLabel(status)}: {count}
-                                                        </span>
-                                                    ))}
-                                                </div>
+                            {containers.length === 0 && !waybillMatch ? (
+                                <div className="py-24 text-center">
+                                    <Package className="mx-auto text-slate-200 mb-4" size={48} />
+                                    <p className="text-slate-400 font-black text-sm uppercase tracking-widest">
+                                        {searchValue.length >= 2
+                                            ? "No containers match your search."
+                                            : "No container loadings available yet."}
+                                    </p>
+                                </div>
+                            ) : (
+                                <>
+                                    {containers.length > 0 && (
+                                        <div className="mb-4 flex items-center justify-between">
+                                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                                {pagination ? `${pagination.total} container${pagination.total !== 1 ? "s" : ""}` : `${containers.length} container${containers.length !== 1 ? "s" : ""}`}
+                                            </p>
+                                            {searchValue.length >= 2 && (
+                                                <button
+                                                    onClick={() => { setSearchValue(""); loadAll(); router.replace("/container-loadings"); }}
+                                                    className="text-xs text-[#039B81] font-black hover:underline"
+                                                >
+                                                    Clear search
+                                                </button>
                                             )}
                                         </div>
+                                    )}
+                                    <div className="flex flex-col gap-4">
+                                        {containers.map((c) => (
+                                            <ContainerCard key={c._id} container={c} />
+                                        ))}
                                     </div>
-                                </div>
-                            ))}
-                        </div>
+                                </>
+                            )}
+                        </>
                     )}
                 </div>
             </section>
@@ -262,10 +414,7 @@ export default function ContainerLoadingsPage() {
             <Navbar />
             <Suspense fallback={
                 <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                    <div className="text-center">
-                        <Loader2 className="animate-spin text-[#039B81] mx-auto" size={32} />
-                        <p className="mt-4 text-slate-400 font-bold text-xs uppercase tracking-widest">Loading...</p>
-                    </div>
+                    <Loader2 className="animate-spin text-[#039B81]" size={32} />
                 </div>
             }>
                 <ContainerLoadingsContent />

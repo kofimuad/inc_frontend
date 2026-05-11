@@ -49,11 +49,15 @@ export default function Footer() {
                         <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
                         <ul className="space-y-2">
                             <li>
+                                <Link href="/container-loadings" className="text-gray-300 hover:text-[#039B81] transition-colors">
+                                    Container Loadings
+                                </Link>
+                            </li>
+                            <li>
                                 <Link href="/address" className="text-gray-300 hover:text-[#039B81] transition-colors">
                                     Shipping Address
                                 </Link>
                             </li>
-                            {/* Replaced Services List with direct Address link as per request context */}
                         </ul>
                     </div>
 

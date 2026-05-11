@@ -8,11 +8,13 @@ import DataTable from "@/components/dashboard/DataTable";
 import CreateShipmentModal from "@/components/dashboard/CreateShipmentModal";
 import UpdateStatusModal from "@/components/dashboard/UpdateStatusModal";
 import BulkUploadModal from "@/components/dashboard/BulkUploadModal";
-import { Ship, CheckCircle, Clock, Plus, Power, FileUp, RefreshCw, AlertTriangle } from "lucide-react";
+import { Ship, CheckCircle, Clock, Plus, Power, FileUp, RefreshCw, AlertTriangle, Anchor, Pencil } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import Button from "@/components/common/Button";
 import { useDebounce } from "@/hooks/useDebounce";
 import { getBatchShipments, getEmployeeStats } from "@/services/shipments";
+import { listContainerLoadingsStaff, type ContainerLoading } from "@/services/containerLoadings";
+import ContainerLoadingModal from "@/components/dashboard/ContainerLoadingModal";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/common/ProtectedRoute";
 import { STATUS_COLORS } from "@/config/constants";
@@ -34,6 +36,11 @@ export default function EmployeeDashboard() {
 
     // Status Modal State
     const [statusModalShipmentId, setStatusModalShipmentId] = useState<string | null>(null);
+
+    // Container Loadings state
+    const [containers, setContainers]               = useState<ContainerLoading[]>([]);
+    const [containerModalOpen, setContainerModalOpen] = useState(false);
+    const [editingContainer, setEditingContainer]   = useState<ContainerLoading | undefined>(undefined);
 
     const fetchShipments = useCallback(async (isSilent = false) => {
         if (!isSilent) setIsLoading(true);
@@ -91,12 +98,22 @@ export default function EmployeeDashboard() {
         }
     }, []);
 
+    const fetchContainers = useCallback(async () => {
+        try {
+            const result = await listContainerLoadingsStaff({ limit: 50 });
+            setContainers(result.containers);
+        } catch {
+            // non-critical — silently ignore
+        }
+    }, []);
+
     const fetchAllData = useCallback(async (isSilent = false) => {
         await Promise.all([
             fetchStats(),
-            fetchShipments(isSilent)
+            fetchShipments(isSilent),
+            fetchContainers(),
         ]);
-    }, [fetchStats, fetchShipments]);
+    }, [fetchStats, fetchShipments, fetchContainers]);
 
     useEffect(() => {
         fetchAllData();
@@ -239,7 +256,66 @@ export default function EmployeeDashboard() {
                             />
                         </div>
 
-                        {/* Table Section */}
+                        {/* Container Loadings Section */}
+                        <div className="mb-12">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
+                                    <span className="w-2 h-8 bg-blue-500 rounded-full" />
+                                    Container Loadings
+                                </h2>
+                                <Button
+                                    onClick={() => { setEditingContainer(undefined); setContainerModalOpen(true); }}
+                                    className="py-2.5 px-5 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#039B81]/20"
+                                >
+                                    <Plus size={16} className="mr-2" />
+                                    New Container
+                                </Button>
+                            </div>
+
+                            {containers.length === 0 ? (
+                                <div className="bg-white rounded-2xl border border-slate-100 py-10 text-center text-slate-400 text-xs font-black uppercase tracking-widest">
+                                    No containers yet. Containers are auto-created from shipped batch uploads.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {containers.map((c) => {
+                                        const statusColors: Record<string, string> = {
+                                            loading: "bg-yellow-100 text-yellow-700",
+                                            shipped: "bg-blue-100 text-blue-700",
+                                            arrived: "bg-emerald-100 text-emerald-700",
+                                            ready:   "bg-[#039B81]/10 text-[#039B81]",
+                                        };
+                                        return (
+                                            <div key={c._id} className="bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-md transition-all group">
+                                                <div className="flex items-start justify-between gap-2 mb-3">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <Anchor size={16} className="text-[#039B81] shrink-0" />
+                                                        <span className="font-black text-slate-800 text-sm truncate">{c.containerNumber}</span>
+                                                    </div>
+                                                    <span className={`shrink-0 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${statusColors[c.status] || "bg-slate-100 text-slate-500"}`}>
+                                                        {c.status}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-slate-500 space-y-1 mb-4">
+                                                    {c.vesselName && <p><span className="font-black text-slate-400 uppercase">Vessel:</span> {c.vesselName}</p>}
+                                                    {c.eta        && <p><span className="font-black text-slate-400 uppercase">ETA:</span> {new Date(c.eta).toLocaleDateString("en-GB")}</p>}
+                                                    {c.blNumber   && <p><span className="font-black text-slate-400 uppercase">BL:</span> {c.blNumber}</p>}
+                                                </div>
+                                                <button
+                                                    onClick={() => { setEditingContainer(c); setContainerModalOpen(true); }}
+                                                    className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-[#039B81] uppercase tracking-widest transition-colors"
+                                                >
+                                                    <Pencil size={12} />
+                                                    Edit
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Shipments Table Section */}
                         <div>
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                                 <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
@@ -315,6 +391,25 @@ export default function EmployeeDashboard() {
                     onClose={() => setIsBulkModalOpen(false)}
                     onSuccess={fetchAllData}
                 />
+
+                {containerModalOpen && (
+                    <ContainerLoadingModal
+                        existing={editingContainer}
+                        onClose={() => setContainerModalOpen(false)}
+                        onSaved={(saved) => {
+                            setContainerModalOpen(false);
+                            setContainers((prev) => {
+                                const idx = prev.findIndex((c) => c._id === saved._id);
+                                if (idx >= 0) {
+                                    const next = [...prev];
+                                    next[idx] = saved;
+                                    return next;
+                                }
+                                return [saved, ...prev];
+                            });
+                        }}
+                    />
+                )}
             </div>
         </ProtectedRoute>
     );
