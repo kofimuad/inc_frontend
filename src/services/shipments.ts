@@ -34,16 +34,14 @@ export const getMyShipments = async (params: Record<string, any> = {}) => {
 // ═══════════════════════════════════════════════════
 
 /**
- * Employee / Admin: Paginated list of all shipments with filters
- * GET /api/shipments?page=&limit=&status=&search=
- * Note: This queries the original Shipment model (individual shipments)
+ * Employee / Admin: Paginated list of all shipment items (manually created)
+ * GET /api/items?page=&limit=&status=&search=
  */
 export const getAllShipments = async (params: Record<string, any> = {}) => {
-    const { data: envelope } = await api.get('/api/shipments', { params });
+    const { data: envelope } = await api.get('/api/items', { params });
     const payload = envelope?.data ?? envelope;
-    // Backend returns { shipments, pagination }, frontend expects { items, pagination }
-    if (payload && payload.shipments) {
-        return { items: payload.shipments, pagination: payload.pagination };
+    if (payload && payload.items) {
+        return { items: payload.items, pagination: payload.pagination };
     }
     return payload;
 };
@@ -63,38 +61,38 @@ export const getBatchShipments = async (params: Record<string, any> = {}) => {
 };
 
 /**
- * Employee / Admin: Create a new shipment
- * POST /api/shipments
+ * Employee / Admin: Create a new shipment item manually
+ * POST /api/items
  */
 export const createShipment = async (payload: NewShipmentPayload) => {
-    const { data: envelope } = await api.post('/api/shipments', payload);
+    const { data: envelope } = await api.post('/api/items', payload);
     return envelope.data;
 };
 
 /**
- * Employee / Admin: Update shipment details
- * PATCH /api/shipments/{id}
+ * Employee / Admin: Update shipment item details
+ * PATCH /api/items/{id}
  */
 export const updateShipment = async (id: string, payload: Record<string, any>) => {
-    const { data: envelope } = await api.patch(`/api/shipments/${id}`, payload);
+    const { data: envelope } = await api.patch(`/api/items/${id}`, payload);
     return envelope.data;
 };
 
 /**
  * Employee / Admin: Full internal detail including staff notes
- * GET /api/shipments/{id}/tracking
+ * GET /api/items/{id}/tracking
  */
 export const getInternalTracking = async (id: string) => {
-    const { data: envelope } = await api.get(`/api/shipments/${id}/tracking`);
+    const { data: envelope } = await api.get(`/api/items/${id}/tracking`);
     return envelope.data;
 };
 
 /**
- * Employee / Admin: Log a new tracking checkpoint
- * POST /api/shipments/{id}/tracking
+ * Employee / Admin: Log a new tracking checkpoint / status update
+ * POST /api/items/{id}/status
  */
 export const logCheckpoint = async (id: string, payload: CheckpointPayload) => {
-    const { data: envelope } = await api.post(`/api/shipments/${id}/tracking`, payload);
+    const { data: envelope } = await api.post(`/api/items/${id}/status`, payload);
     return envelope.data;
 };
 
@@ -231,8 +229,6 @@ export const uploadBatchShipped = async (file: File) => {
 export const uploadBatchArrived = async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const { data: envelope } = await api.post('/api/batches/arrived', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    const { data: envelope } = await api.post('/api/batches/arrived', formData);
     return envelope.data;
 };

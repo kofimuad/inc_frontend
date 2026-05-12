@@ -13,13 +13,13 @@ interface UpdateStatusModalProps {
 const STATUS_OPTIONS = [
     { value: "pending", label: "Pending" },
     { value: "picked_up", label: "Picked Up" },
-    { value: "on_hold", label: "On Hold" },
     { value: "in_transit", label: "In Transit" },
     { value: "customs", label: "Customs" },
     { value: "out_for_delivery", label: "Out for Delivery" },
     { value: "delivered", label: "Delivered" },
     { value: "failed", label: "Failed" },
     { value: "returned", label: "Returned" },
+    { value: "held", label: "On Hold" },
 ];
 
 export default function UpdateStatusModal({ isOpen, onClose, onSuccess, shipmentId }: UpdateStatusModalProps) {
