@@ -12,7 +12,7 @@ export const useTracking = (trackingNumber: string) => {
         setIsLoading(true);
         setError(null);
         try {
-            const { data: envelope } = await api.get(`/api/shipments/${num}/tracking`);
+            const { data: envelope } = await api.get(`/api/tracking/${num}`);
             // Backend returns { success, message, data: { shipment, events } }
             setTrackingData(envelope.data);
         } catch (err: any) {

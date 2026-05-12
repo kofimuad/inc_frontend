@@ -83,7 +83,7 @@ export default function EmployeeDashboard() {
                 getEmployeeStats(),
                 getBatchShipments({ limit: 1 }),
                 getBatchShipments({ limit: 1, status: 'pending' }),
-                getBatchShipments({ limit: 1, status: 'on_hold' }),
+                getBatchShipments({ limit: 1, status: 'held' }),
                 getBatchShipments({ limit: 1, status: 'delivered' })
             ]);
 
@@ -330,7 +330,7 @@ export default function EmployeeDashboard() {
                                     {[
                                         { id: 'all', label: 'All' },
                                         { id: 'pending', label: 'Intake' },
-                                        { id: 'on_hold', label: 'Held' },
+                                        { id: 'held', label: 'Held' },
                                         { id: 'in_transit', label: 'Shipped' },
                                         { id: 'delivered', label: 'Arrived' }
                                     ].map((s) => (
