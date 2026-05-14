@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -rn \"POST.*arrived\\\\|uploadArrived\" \"C:\\\\Users\\\\iamko\\\\Documents\\\\MEST_Backend\\\\inc_backend\\\\src\" --include=\"*.js\" 2>/dev/null)",
+      "Read(//c/Users/iamko/Documents/MEST_Backend/inc_backend/src/**)"
+    ]
+  }
+}

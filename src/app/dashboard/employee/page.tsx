@@ -8,6 +8,7 @@ import DataTable from "@/components/dashboard/DataTable";
 import CreateShipmentModal from "@/components/dashboard/CreateShipmentModal";
 import UpdateStatusModal from "@/components/dashboard/UpdateStatusModal";
 import BulkUploadModal from "@/components/dashboard/BulkUploadModal";
+import EditItemModal from "@/components/dashboard/EditItemModal";
 import { Ship, CheckCircle, Clock, Plus, Power, FileUp, RefreshCw, AlertTriangle, Anchor, Pencil } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import Button from "@/components/common/Button";
@@ -36,6 +37,9 @@ export default function EmployeeDashboard() {
 
     // Status Modal State
     const [statusModalShipmentId, setStatusModalShipmentId] = useState<string | null>(null);
+
+    // Edit Item Modal State
+    const [editingItem, setEditingItem] = useState<any>(null);
 
     // Container Loadings state
     const [containers, setContainers]               = useState<ContainerLoading[]>([]);
@@ -135,14 +139,31 @@ export default function EmployeeDashboard() {
         return STATUS_COLORS[status] || STATUS_COLORS.default;
     };
 
+    const MISSING_KEYS = ["customerName", "customerPhone", "destinationCity", "productDescription", "quantity"];
+    const hasMissingFields = (item: any) =>
+        MISSING_KEYS.some((k) => item[k] === null || item[k] === undefined || String(item[k]).trim() === "");
+
     const columns = [
-        { header: "Tracking Number", accessor: "waybillNo" },
+        {
+            header: "Tracking Number",
+            accessor: "waybillNo",
+            render: (item: any) => (
+                <span className="flex items-center gap-1.5">
+                    <span className="text-sm font-mono font-bold text-slate-800">{item.waybillNo || "—"}</span>
+                    {hasMissingFields(item) && (
+                        <span title="Has missing fields">
+                            <AlertTriangle size={13} className="text-amber-500 shrink-0" />
+                        </span>
+                    )}
+                </span>
+            )
+        },
         { header: "Invoice #", accessor: "invoiceNo" },
         { header: "Customer", accessor: "customerName" },
         { header: "Description", accessor: "productDescription" },
         { header: "Destination", accessor: "destinationCity" },
-        { 
-            header: "Qty", 
+        {
+            header: "Qty",
             accessor: "itemsCount",
             render: (item: any) => (
                 <span className="text-sm font-black text-slate-700 bg-slate-100 px-2 py-1 rounded-lg">
@@ -179,12 +200,21 @@ export default function EmployeeDashboard() {
             header: "Actions",
             accessor: "_id",
             render: (item: any) => (
-                <button
-                    onClick={() => setStatusModalShipmentId(item._id)}
-                    className="text-[#039B81] font-bold text-[10px] uppercase tracking-widest hover:underline"
-                >
-                    Update
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setStatusModalShipmentId(item._id)}
+                        className="text-[#039B81] font-bold text-[10px] uppercase tracking-widest hover:underline"
+                    >
+                        Update
+                    </button>
+                    <button
+                        onClick={() => setEditingItem(item)}
+                        className="flex items-center gap-1 text-slate-400 hover:text-slate-700 font-bold text-[10px] uppercase tracking-widest transition-colors"
+                    >
+                        <Pencil size={11} />
+                        Edit
+                    </button>
+                </div>
             )
         }
     ];
@@ -394,6 +424,19 @@ export default function EmployeeDashboard() {
                     onClose={() => setIsBulkModalOpen(false)}
                     onSuccess={fetchAllData}
                 />
+
+                {editingItem && (
+                    <EditItemModal
+                        item={editingItem}
+                        onClose={() => setEditingItem(null)}
+                        onSaved={(updated) => {
+                            setShipments((prev) =>
+                                prev.map((s) => (s._id === updated._id ? updated : s))
+                            );
+                            setEditingItem(null);
+                        }}
+                    />
+                )}
 
                 {containerModalOpen && (
                     <ContainerLoadingModal

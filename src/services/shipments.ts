@@ -223,6 +223,24 @@ export const uploadBatchShipped = async (file: File) => {
 };
 
 /**
+ * Staff: Update a single batch shipment item's details (fill in missing / correct fields)
+ * PATCH /api/batches/items/:itemId
+ */
+export const updateBatchItem = async (itemId: string, updates: Record<string, any>) => {
+    const { data: envelope } = await api.patch(`/api/batches/items/${itemId}`, updates);
+    return envelope.data;
+};
+
+/**
+ * Staff: Get all items belonging to a specific batch
+ * GET /api/batches/:batchId/items
+ */
+export const fetchBatchItems = async (batchId: string, params: Record<string, any> = {}) => {
+    const { data: envelope } = await api.get(`/api/batches/${batchId}/items`, { params });
+    return envelope.data;
+};
+
+/**
  * Stage 3: Ghana Arrival
  * POST /api/batches/arrived
  */
