@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Info } from "lucide-react";
+import { X, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Info, ClipboardList } from "lucide-react";
 import Button from "@/components/common/Button";
 import { uploadBatchShipped, uploadBatchArrived, uploadBatchIntake } from "@/services/shipments";
 
@@ -38,23 +38,18 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
     const handleUpload = async () => {
         if (!file) return;
 
-        console.log("Starting bulk upload for stage:", stage);
         setIsLoading(true);
         setError(null);
         try {
             let data;
             if (stage === 'intake') {
-                console.log("Calling uploadBatchIntake...");
                 data = await uploadBatchIntake(file);
             } else if (stage === 'shipped') {
-                console.log("Calling uploadBatchShipped...");
                 data = await uploadBatchShipped(file);
             } else if (stage === 'arrived') {
-                console.log("Calling uploadBatchArrived...");
                 data = await uploadBatchArrived(file);
             }
 
-            console.log("Upload result:", data);
             const batch = data?.batch;
             setResult({
                 updated: batch?.matchedItems ?? 0,
@@ -64,7 +59,6 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
             });
             onSuccess();
         } catch (err: any) {
-            console.error("Bulk upload error details:", err.response?.data);
             const serverData = err.response?.data;
             const statusCode = err.response?.status;
 
@@ -93,7 +87,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-100 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden border border-slate-100">
                 {/* Header */}
                 <div className="flex items-center justify-between p-8 border-b border-slate-50">
@@ -109,19 +103,19 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                 <div className="p-8 space-y-8">
                     {/* Stage Selection */}
                     <div>
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Select Update Stage</label>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Select Upload Stage</label>
                         <div className="grid grid-cols-3 gap-3">
                             {[
-                                { id: 'intake', label: '1. Intake', desc: 'Warehouse' },
-                                { id: 'shipped', label: '2. Shipped', desc: 'China Departure' },
+                                { id: 'intake',  label: '1. Intake',  desc: 'Goods Received' },
+                                { id: 'shipped', label: '2. Packing', desc: 'Loading List' },
                                 { id: 'arrived', label: '3. Arrived', desc: 'Ghana Entry' }
                             ].map((s) => (
                                 <button
                                     key={s.id}
                                     onClick={() => { setStage(s.id as Stage); setFile(null); setResult(null); setError(null); setIsDuplicate(false); }}
                                     className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-1 ${
-                                        stage === s.id 
-                                        ? "border-[#039B81] bg-[#039B81]/5 text-[#039B81]" 
+                                        stage === s.id
+                                        ? "border-[#039B81] bg-[#039B81]/5 text-[#039B81]"
                                         : "border-slate-100 hover:border-slate-200 text-slate-500"
                                     }`}
                                 >
@@ -134,24 +128,28 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
 
                     {/* Format Info */}
                     <div className="p-4 bg-amber-50 rounded-2xl flex gap-3 border border-amber-100">
-                        <AlertCircle className="text-amber-500 shrink-0" size={20} />
+                        <AlertCircle className="text-amber-500 shrink-0 mt-0.5" size={18} />
                         <div className="text-xs text-amber-800 leading-relaxed font-bold">
                             {stage === 'intake' ? (
                                 <span>
-                                    <span className="text-[#039B81] uppercase font-black tracking-widest block mb-1">China Warehouse Format:</span>
-                                    Excel must have 5 columns: <span className="text-slate-900 border-b border-slate-200">Delivery Notes, Tracking Number, Phone number, Quantity, Received Goods</span>.
-                                    <span className="block mt-1 opacity-70">Headers on Row 1, Data starts from Row 2.</span>
+                                    <span className="text-[#039B81] uppercase font-black tracking-widest block mb-1">Goods Received List Format:</span>
+                                    No header row. 5 columns in order:{" "}
+                                    <span className="text-slate-900">Invoice No, Job Number (Waybill), Customer Phone, Quantity, Date</span>.
                                 </span>
                             ) : stage === 'shipped' ? (
                                 <span>
-                                    <span className="text-[#039B81] uppercase font-black tracking-widest block mb-1">China Departure (Stage 2) Format:</span>
-                                    Excel must have 11 columns: <span className="text-slate-900 border-b border-slate-200">Invoice No, Tracking No, Contact, Customer Name, Location, Qty, CBM, Description, KG, Other, Date</span>.
-                                    <span className="block mt-1 opacity-70">Headers on Row 4. Data starts from Row 5. Container info in Rows 2-3.</span>
+                                    <span className="text-[#039B81] uppercase font-black tracking-widest block mb-1">Packing / Loading List Format:</span>
+                                    Rows 1–8: metadata (BL NUMBER, CTR NUMBER, VOLUME, SEAL NUMBER, PACKING LIST NUMBER, LOADING DATE, ETD, ETA).{" "}
+                                    Row 9: column headers. Data from row 10.
+                                    <br />
+                                    <span className="block mt-1">Required columns:{" "}
+                                        <span className="text-slate-900">JOB NUMBER, CNEE NAME, CUSTOMER NO (or PHONE NUMBER), LOCATION, GOODS TYPE, QUANTITY, CBM, DESCRIPTION, COLLECT O/F AMOUNT, PAYMENT TERM $, REMARKS</span>.
+                                    </span>
                                 </span>
                             ) : (
                                 <span>
-                                    <span className="text-[#039B81] uppercase font-black tracking-widest block mb-1">Ghana Arrival (Stage 3) Format:</span>
-                                    Excel must have standard arrived columns. Headers on Row 1.
+                                    <span className="text-[#039B81] uppercase font-black tracking-widest block mb-1">Goods Arrived List Format:</span>
+                                    Upload the Ghana arrival list. Headers on Row 1.
                                 </span>
                             )}
                         </div>
@@ -160,9 +158,9 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                     {/* File Upload Zone */}
                     {!result ? (
                         <div className="relative group">
-                            <input 
-                                type="file" 
-                                accept=".xlsx,.xls" 
+                            <input
+                                type="file"
+                                accept=".xlsx,.xls"
                                 onChange={handleFileChange}
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                             />
@@ -214,6 +212,14 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                                     </div>
                                 )}
                             </div>
+                            {/* Review prompt */}
+                            <div className="mt-6 p-3 bg-amber-50 border border-amber-100 rounded-2xl flex items-center gap-2 text-left">
+                                <ClipboardList size={16} className="text-amber-500 shrink-0" />
+                                <p className="text-[11px] text-amber-800 font-bold leading-snug">
+                                    Some items may have missing data from the sheet. Use the{" "}
+                                    <span className="text-[#039B81] font-black">Edit</span> button in the shipments table to fill in any empty fields.
+                                </p>
+                            </div>
                         </div>
                     )}
 
@@ -236,17 +242,17 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
 
                     {/* Actions */}
                     <div className="flex gap-4">
-                        <Button 
-                            variant="outline" 
-                            onClick={onClose} 
+                        <Button
+                            variant="outline"
+                            onClick={onClose}
                             className="flex-1 py-4 text-xs font-black uppercase tracking-widest bg-white"
                         >
                             {result ? "Close" : "Cancel"}
                         </Button>
                         {!result && (
-                            <Button 
-                                onClick={handleUpload} 
-                                isLoading={isLoading} 
+                            <Button
+                                onClick={handleUpload}
+                                isLoading={isLoading}
                                 disabled={!file}
                                 className="flex-1 py-4 text-xs font-black uppercase tracking-widest shadow-xl shadow-[#039B81]/20"
                             >
