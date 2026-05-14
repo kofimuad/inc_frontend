@@ -87,13 +87,21 @@ export default function EditItemModal({ item, onClose, onSaved }: EditItemModalP
         setIsSaving(true);
         setError(null);
         try {
-            // Only send fields that differ from original or were previously empty
             const updates: Record<string, any> = {};
             FIELD_GROUPS.forEach(({ fields }) =>
                 fields.forEach(({ key, type }) => {
-                    const val = form[key];
-                    if (val === "" || val === null || val === undefined) return;
-                    updates[key] = type === "number" ? parseFloat(String(val)) : String(val).trim();
+                    if (key === "waybillNo") return; // readonly — never send
+                    const newVal = form[key];
+                    const origVal = item[key] ?? "";
+                    const newEmpty  = newVal === "" || newVal === null || newVal === undefined;
+                    const origEmpty = origVal === "" || origVal === null || origVal === undefined;
+
+                    if (newEmpty && origEmpty) return; // no change, both empty — skip
+                    if (newEmpty && !origEmpty) {
+                        updates[key] = null; // user explicitly cleared a previously-set field
+                    } else {
+                        updates[key] = type === "number" ? parseFloat(String(newVal)) : String(newVal).trim();
+                    }
                 })
             );
             if (Object.keys(updates).length === 0) {
@@ -111,7 +119,7 @@ export default function EditItemModal({ item, onClose, onSaved }: EditItemModalP
     };
 
     return (
-        <div className="fixed inset-0 z-[200] bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-200 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
                 {/* Header */}
                 <div className="flex items-start justify-between p-6 border-b border-slate-100 shrink-0">

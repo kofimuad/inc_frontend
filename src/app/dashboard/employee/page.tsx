@@ -159,7 +159,20 @@ export default function EmployeeDashboard() {
             )
         },
         { header: "Invoice #", accessor: "invoiceNo" },
-        { header: "Customer", accessor: "customerName" },
+        {
+            header: "Customer",
+            accessor: "customerName",
+            render: (item: any) => (
+                <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-semibold text-slate-800">{item.customerName || <span className="text-slate-300 italic text-xs">No name</span>}</span>
+                    {item.customerPhoneRaw || item.customerPhone ? (
+                        <span className="text-[11px] font-mono text-slate-400">{item.customerPhoneRaw || item.customerPhone}</span>
+                    ) : (
+                        <span className="text-[11px] text-amber-400 font-bold">No phone</span>
+                    )}
+                </div>
+            )
+        },
         { header: "Description", accessor: "productDescription" },
         { header: "Destination", accessor: "destinationCity" },
         {
