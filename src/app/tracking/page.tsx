@@ -37,8 +37,8 @@ function TrackingContent() {
             try {
                 // API returns { shipment, events }
                 const data = await getPublicTracking(trackingNumber);
-                setShipment(data?.shipment || data);
-                setEvents(data?.events || []);
+                setShipment(data);
+                setEvents(data?.timeline || []);
                 setResult("found");
             } catch (error) {
                 console.error("Tracking API Error", error);
@@ -70,7 +70,7 @@ function TrackingContent() {
                                 <Package className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                                 <input
                                     type="text"
-                                    placeholder="Enter tracking number (e.g., GHA-2024-001234)"
+                                    placeholder="Enter your tracking number"
                                     value={trackingNumber}
                                     onChange={(e) => setTrackingNumber(e.target.value)}
                                     className="w-full pl-14 pr-4 py-4 rounded-xl bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:bg-white focus:border-[#039B81]/30 transition-all font-medium text-sm"
@@ -131,28 +131,30 @@ function TrackingContent() {
                                     </div>
                                     <div className="flex items-center gap-2 px-4 py-2 bg-[#039B81]/10 rounded-xl justify-center">
                                         <div className="w-2 h-2 bg-[#039B81] rounded-full animate-pulse" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-[#039B81]">{getStatusDisplay(shipment.status)}</span>
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-[#039B81]">{getStatusDisplay(shipment.status?.code || shipment.status)}</span>
                                     </div>
                                 </div>
 
                                 <div className="grid md:grid-cols-4 gap-4">
                                     <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Origin</p>
-                                        <p className="font-semibold text-sm text-slate-800">{formatLocation(shipment.origin) || shipment.originCity || "N/A"}</p>
+                                        <p className="font-semibold text-sm text-slate-800">{formatLocation(shipment.route?.origin || shipment.origin) || shipment.originCity || "N/A"}</p>
                                     </div>
                                     <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Destination</p>
-                                        <p className="font-semibold text-sm text-slate-800">{formatLocation(shipment.destination) || shipment.destinationCity || "N/A"}</p>
+                                        <p className="font-semibold text-sm text-slate-800">{formatLocation(shipment.route?.destination || shipment.destination) || shipment.route?.destinationCity || shipment.destinationCity || "N/A"}</p>
                                     </div>
                                     <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Est. Delivery</p>
                                         <p className="font-semibold text-sm text-slate-800">
-                                            {shipment.estimatedDelivery ? new Date(shipment.estimatedDelivery).toLocaleDateString() : 'TBD'}
+                                            {(shipment.dates?.estimatedDelivery || shipment.estimatedDelivery)
+                                                ? new Date(shipment.dates?.estimatedDelivery || shipment.estimatedDelivery).toLocaleDateString()
+                                                : 'TBD'}
                                         </p>
                                     </div>
                                     <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Weight</p>
-                                        <p className="font-semibold text-sm text-slate-800">{shipment.weight ? `${shipment.weight} kg` : 'N/A'}</p>
+                                        <p className="font-semibold text-sm text-slate-800">{(shipment.cargo?.weight || shipment.weight) ? `${shipment.cargo?.weight || shipment.weight} kg` : 'N/A'}</p>
                                     </div>
                                 </div>
                             </div>
