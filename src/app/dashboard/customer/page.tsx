@@ -30,10 +30,16 @@ export default function CustomerDashboard() {
         getCustomerStats()
       ]);
       
-      // API returns { total, grouped, pagination } from /api/batch-shipments/mine
-      const items = Array.isArray(shipmentsData)
-        ? shipmentsData
-        : shipmentsData?.grouped || shipmentsData?.items || shipmentsData?.shipments || [];
+      // API returns { total, grouped: { in_warehouse, shipped, held }, pagination }
+      // Flatten grouped object into a single array so .length / .filter / .map work correctly.
+      let items: any[] = [];
+      if (Array.isArray(shipmentsData)) {
+        items = shipmentsData;
+      } else if (shipmentsData?.grouped && typeof shipmentsData.grouped === "object") {
+        items = (Object.values(shipmentsData.grouped) as any[][]).flat();
+      } else if (Array.isArray(shipmentsData?.items)) {
+        items = shipmentsData.items;
+      }
       setShipments(items);
       setStats(statsData);
     } catch (error) {
@@ -116,7 +122,7 @@ export default function CustomerDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
               <StatsWidget
                 title="Total Shipments"
-                value={stats ? String(stats.totalShipments ?? 0) : "..."}
+                value={stats ? String(stats.totalItems ?? stats.totalShipments ?? 0) : "..."}
                 icon={Package}
                 trend={{ value: 8, isPositive: true }}
                 color="indigo"
