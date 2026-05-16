@@ -21,6 +21,23 @@ export const getPublicTracking = async (trackingNumber: string) => {
 };
 
 /**
+ * Public: Look up all shipments for a phone number (no auth needed)
+ * GET /api/tracking/phone/{phone}
+ * Returns { total, grouped: { in_warehouse, shipped, held } }
+ */
+export const getPublicTrackingByPhone = async (phone: string) => {
+    const { data: envelope } = await api.get(`/api/tracking/phone/${encodeURIComponent(phone)}`);
+    return envelope.data as {
+        total: number;
+        grouped: {
+            in_warehouse: any[];
+            shipped: any[];
+            held: any[];
+        };
+    };
+};
+
+/**
  * Customers: See only your own shipments (paginated)
  * GET /api/batch-shipments/mine
  */

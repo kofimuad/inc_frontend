@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Activity, Cpu, Settings, RefreshCw, ShieldCheck, Globe, Mail } from "lucide-react";
+import { X, Activity, Cpu, Settings, RefreshCw, ShieldCheck, Globe, Mail, DollarSign, Save, Check } from "lucide-react";
 import DataTable from "./DataTable";
 import Button from "@/components/common/Button";
 import { getAuditLogs, getGpsDevices, triggerCleanup } from "@/services/admin";
+import { getSettings, updateSettings, AppSettings } from "@/services/settings";
 
 interface SystemSettingsModalProps {
     onClose: () => void;
@@ -19,6 +20,29 @@ export default function SystemSettingsModal({ onClose }: SystemSettingsModalProp
     const [loading, setLoading] = useState(false);
     const [cleanupResult, setCleanupResult] = useState<any>(null);
     const [cleanupLoading, setCleanupLoading] = useState(false);
+    const [rates, setRates] = useState<AppSettings>({ cbmRate: 230, usdToGhsRate: 15.2 });
+    const [ratesSaving, setRatesSaving] = useState(false);
+    const [ratesSaved, setRatesSaved] = useState(false);
+    const [ratesError, setRatesError] = useState<string | null>(null);
+
+    useEffect(() => {
+        getSettings().then(setRates).catch(() => {});
+    }, []);
+
+    const handleSaveRates = async () => {
+        setRatesSaving(true);
+        setRatesError(null);
+        try {
+            const updated = await updateSettings(rates);
+            setRates(updated);
+            setRatesSaved(true);
+            setTimeout(() => setRatesSaved(false), 2500);
+        } catch {
+            setRatesError("Failed to save. Please try again.");
+        } finally {
+            setRatesSaving(false);
+        }
+    };
 
     const handleRunCleanup = async () => {
         setCleanupLoading(true);
@@ -192,6 +216,12 @@ export default function SystemSettingsModal({ onClose }: SystemSettingsModalProp
                                     onRunCleanup={handleRunCleanup}
                                     cleanupLoading={cleanupLoading}
                                     cleanupResult={cleanupResult}
+                                    rates={rates}
+                                    onRatesChange={setRates}
+                                    onSaveRates={handleSaveRates}
+                                    ratesSaving={ratesSaving}
+                                    ratesSaved={ratesSaved}
+                                    ratesError={ratesError}
                                 />
                             )}
                         </div>
@@ -229,11 +259,19 @@ function TabButton({ active, onClick, icon: Icon, label }: any) {
     );
 }
 
-function PlatformConfigView({ onRunCleanup, cleanupLoading, cleanupResult }: {
+function PlatformConfigView({ onRunCleanup, cleanupLoading, cleanupResult, rates, onRatesChange, onSaveRates, ratesSaving, ratesSaved, ratesError }: {
     onRunCleanup: () => void;
     cleanupLoading: boolean;
     cleanupResult: { success: boolean; data?: any } | null;
+    rates: AppSettings;
+    onRatesChange: (r: AppSettings) => void;
+    onSaveRates: () => void;
+    ratesSaving: boolean;
+    ratesSaved: boolean;
+    ratesError: string | null;
 }) {
+    const rateCls = "w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:border-[#039B81]/30 transition-all";
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
@@ -281,6 +319,64 @@ function PlatformConfigView({ onRunCleanup, cleanupLoading, cleanupResult }: {
                             <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm" />
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {/* Shipping Rates */}
+            <div className="md:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <DollarSign size={16} className="text-[#039B81]" />
+                    Shipping Rates
+                </h3>
+                <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                            Rate per CBM (USD)
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">$</span>
+                            <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={rates.cbmRate}
+                                onChange={(e) => onRatesChange({ ...rates, cbmRate: parseFloat(e.target.value) || 0 })}
+                                className={`${rateCls} pl-8`}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                            USD → GHS Exchange Rate
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">GH₵</span>
+                            <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={rates.usdToGhsRate}
+                                onChange={(e) => onRatesChange({ ...rates, usdToGhsRate: parseFloat(e.target.value) || 0 })}
+                                className={`${rateCls} pl-12`}
+                            />
+                        </div>
+                    </div>
+                </div>
+                <div className="flex items-center gap-4">
+                    <Button
+                        onClick={onSaveRates}
+                        isLoading={ratesSaving}
+                        className="px-6 py-2.5 text-[10px] font-black uppercase tracking-widest shadow-md shadow-[#039B81]/20"
+                    >
+                        {ratesSaved ? <Check size={14} className="mr-2" /> : <Save size={14} className="mr-2" />}
+                        {ratesSaved ? "Saved!" : "Save Rates"}
+                    </Button>
+                    {ratesError && (
+                        <p className="text-xs font-semibold text-red-500">{ratesError}</p>
+                    )}
+                    {ratesSaved && (
+                        <p className="text-xs font-semibold text-emerald-600">Rates updated — calculator will reflect the new values immediately.</p>
+                    )}
                 </div>
             </div>
 
