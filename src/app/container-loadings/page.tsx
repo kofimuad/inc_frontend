@@ -2,15 +2,13 @@
 
 import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
-import { Ship, Anchor, Package, Search, Loader2, ChevronDown, ChevronUp, MapPin, Clock } from "lucide-react";
+import { Ship, Anchor, Package, Search, Loader2, MapPin, Clock } from "lucide-react";
 import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
     listContainerLoadings,
     searchContainerLoadings,
-    getContainerLoading,
     type ContainerLoading,
-    type ContainerItem,
 } from "@/services/containerLoadings";
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
@@ -52,39 +50,21 @@ function formatDate(dateStr?: string) {
     return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-// ─── Container card with expandable items ─────────────────────────────────────
+// Derive a public-facing reference ID from the container's DB _id.
+// Real container numbers (e.g. MSBU8308501) are never shown to the public.
+function publicContainerRef(id: string) {
+    return "ICL-" + id.slice(-6).toUpperCase();
+}
+
+// ─── Container card — public view (no expandable items table) ─────────────────
 
 function ContainerCard({ container }: { container: ContainerLoading }) {
-    const [expanded, setExpanded] = useState(false);
-    const [items, setItems]       = useState<ContainerItem[]>([]);
-    const [loadingItems, setLoadingItems] = useState(false);
-
-    const toggleExpand = async () => {
-        if (!expanded && items.length === 0) {
-            setLoadingItems(true);
-            try {
-                const result = await getContainerLoading(container._id);
-                setItems(result.items);
-            } catch {
-                setItems([]);
-            } finally {
-                setLoadingItems(false);
-            }
-        }
-        setExpanded((v) => !v);
-    };
-
     return (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-all overflow-hidden">
-            {/* Card header — always visible */}
-            <button
-                onClick={toggleExpand}
-                className="w-full text-left p-6 group"
-                aria-expanded={expanded}
-            >
+            <div className="p-6">
                 <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                     {/* Icon */}
-                    <div className="hidden sm:flex shrink-0 w-14 h-14 bg-[#039B81]/10 rounded-2xl items-center justify-center group-hover:scale-105 transition-transform duration-300">
+                    <div className="hidden sm:flex shrink-0 w-14 h-14 bg-[#039B81]/10 rounded-2xl items-center justify-center">
                         <Ship className="text-[#039B81]" size={26} />
                     </div>
 
@@ -92,7 +72,7 @@ function ContainerCard({ container }: { container: ContainerLoading }) {
                     <div className="flex-grow min-w-0">
                         <div className="flex flex-wrap items-center gap-3 mb-3">
                             <h3 className="text-xl font-black text-slate-800 tracking-tight truncate">
-                                {container.containerNumber}
+                                {publicContainerRef(container._id)}
                             </h3>
                             <StatusBadge status={container.status} />
                         </div>
@@ -134,88 +114,35 @@ function ContainerCard({ container }: { container: ContainerLoading }) {
                             </p>
                         )}
                     </div>
-
-                    {/* Expand toggle */}
-                    <div className="shrink-0 self-center text-slate-300 group-hover:text-[#039B81] transition-colors">
-                        {expanded ? <ChevronUp size={22} /> : <ChevronDown size={22} />}
-                    </div>
                 </div>
-            </button>
-
-            {/* Expandable items list */}
-            {expanded && (
-                <div className="border-t border-slate-100 bg-slate-50/60 px-6 py-4">
-                    {loadingItems ? (
-                        <div className="flex items-center gap-3 py-4 text-slate-400">
-                            <Loader2 className="animate-spin" size={16} />
-                            <span className="text-xs font-bold uppercase tracking-widest">Loading items...</span>
-                        </div>
-                    ) : items.length === 0 ? (
-                        <p className="text-xs text-slate-400 font-medium py-3">No items found for this container.</p>
-                    ) : (
-                        <div className="space-y-2">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                                {items.length} item{items.length !== 1 ? "s" : ""} in this container
-                            </p>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-xs min-w-[480px]">
-                                    <thead>
-                                        <tr className="text-[10px] text-slate-400 font-black uppercase tracking-widest text-left">
-                                            <th className="pb-2 pr-4">Waybill</th>
-                                            <th className="pb-2 pr-4">Customer</th>
-                                            <th className="pb-2 pr-4">Destination</th>
-                                            <th className="pb-2 pr-4">Description</th>
-                                            <th className="pb-2 pr-4">Qty</th>
-                                            <th className="pb-2">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {items.map((item) => (
-                                            <tr key={item.waybillNo} className="hover:bg-white/70 transition-colors">
-                                                <td className="py-2 pr-4 font-black text-slate-800">{item.waybillNo}</td>
-                                                <td className="py-2 pr-4 text-slate-600 font-medium">{item.customerName || "—"}</td>
-                                                <td className="py-2 pr-4 text-slate-600">{item.destinationCity || "—"}</td>
-                                                <td className="py-2 pr-4 text-slate-500 max-w-[150px] truncate">{item.productDescription || "—"}</td>
-                                                <td className="py-2 pr-4 text-slate-600">{item.quantity ?? "—"}</td>
-                                                <td className="py-2"><ItemStatusBadge status={item.status} /></td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
+            </div>
         </div>
     );
 }
 
-// ─── Waybill match result card ────────────────────────────────────────────────
+// ─── Tracking number match result card ────────────────────────────────────────
 
-function WaybillMatchCard({ item, container }: { item: any; container: ContainerLoading }) {
+function TrackingMatchCard({ item, container }: { item: any; container: ContainerLoading }) {
     return (
         <div className="bg-[#039B81]/5 border-2 border-[#039B81]/20 rounded-3xl p-6 mb-6">
-            <p className="text-[10px] font-black text-[#039B81] uppercase tracking-widest mb-3">Waybill Match Found</p>
+            <p className="text-[10px] font-black text-[#039B81] uppercase tracking-widest mb-3">Tracking Number Found</p>
             <div className="flex flex-wrap items-center gap-4 mb-4">
                 <div>
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Waybill</p>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Tracking Number</p>
                     <p className="font-black text-slate-800 text-lg">{item.waybillNo}</p>
                 </div>
-                <div>
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Customer</p>
-                    <p className="font-bold text-slate-700">{item.customerName || "—"}</p>
-                </div>
-                <div>
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Destination</p>
-                    <p className="font-bold text-slate-700">{item.destinationCity || "—"}</p>
-                </div>
+                {item.destinationCity && (
+                    <div>
+                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Destination</p>
+                        <p className="font-bold text-slate-700">{item.destinationCity}</p>
+                    </div>
+                )}
                 <ItemStatusBadge status={item.status} />
             </div>
             <div className="border-t border-[#039B81]/10 pt-4">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Container</p>
                 <div className="flex flex-wrap items-center gap-3">
-                    <span className="font-black text-slate-800">{container.containerNumber}</span>
+                    <span className="font-black text-slate-800">{publicContainerRef(container._id)}</span>
                     <StatusBadge status={container.status} />
                     {container.eta && (
                         <span className="text-xs text-slate-500 flex items-center gap-1">
@@ -314,18 +241,18 @@ function ContainerLoadingsContent() {
                         Container Loadings
                     </h1>
                     <p className="text-slate-500 font-medium max-w-xl mx-auto mb-8">
-                        Track shipping containers from Guangzhou to Tema Port. Search by container number or your waybill number.
+                        Track shipping containers from Guangzhou to Tema Port. Enter your tracking number to find your shipment.
                     </p>
 
                     {/* Search bar */}
                     <div className="relative max-w-lg mx-auto">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
-                        {(isSearching) && (
+                        {isSearching && (
                             <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 text-[#039B81] animate-spin" size={18} />
                         )}
                         <input
                             type="text"
-                            placeholder="Container number or waybill / job number..."
+                            placeholder="Enter your tracking number..."
                             value={searchValue}
                             onChange={handleSearchChange}
                             className="w-full pl-12 pr-12 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:border-[#039B81]/50 transition-all font-medium shadow-sm"
@@ -364,7 +291,7 @@ function ContainerLoadingsContent() {
                     ) : (
                         <>
                             {waybillMatch && (
-                                <WaybillMatchCard item={waybillMatch.item} container={waybillMatch.container} />
+                                <TrackingMatchCard item={waybillMatch.item} container={waybillMatch.container} />
                             )}
 
                             {containers.length === 0 && !waybillMatch ? (
@@ -372,7 +299,7 @@ function ContainerLoadingsContent() {
                                     <Package className="mx-auto text-slate-200 mb-4" size={48} />
                                     <p className="text-slate-400 font-black text-sm uppercase tracking-widest">
                                         {searchValue.length >= 2
-                                            ? "No containers match your search."
+                                            ? "No tracking number found. Please check and try again."
                                             : "No container loadings available yet."}
                                     </p>
                                 </div>
