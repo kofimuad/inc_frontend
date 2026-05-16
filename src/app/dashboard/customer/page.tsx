@@ -373,7 +373,9 @@ export default function CustomerDashboard() {
                             s.goodsType ||
                             "—";
                           const qty = s.quantity ?? s.itemsCount ?? 0;
-                          const container = fakeContainerRef(id);
+                          // Use the batch _id so all items in the same shipment batch share the same fake ref
+                          const batchId = s.shippedBatch?._id || s.intakeBatch?._id || id;
+                          const container = fakeContainerRef(batchId);
                           const statusKey = s.status || "pending";
                           const statusBadge =
                             STATUS_COLORS[statusKey] || STATUS_COLORS.default;

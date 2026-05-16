@@ -100,7 +100,8 @@ api.interceptors.request.use(
                         token = await doRefresh();
                         processQueue(null, token);
                     } catch (err) {
-                        processQueue(err, null);
+                        // Resolve the queue with no token so public-route requests still proceed
+                        processQueue(null, null);
                         setAccessToken(null);
                         token = null;
                     } finally {
@@ -153,9 +154,10 @@ api.interceptors.response.use(
                 originalRequest.headers.Authorization = `Bearer ${newToken}`;
                 return api(originalRequest);
             } catch (refreshError) {
-                processQueue(refreshError, null);
+                processQueue(null, null);
                 setAccessToken(null);
-                return Promise.reject(refreshError);
+                // Reject with the original 401 error so callers see the real failure
+                return Promise.reject(error);
             } finally {
                 isRefreshing = false;
             }

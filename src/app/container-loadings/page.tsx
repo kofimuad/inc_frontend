@@ -180,8 +180,14 @@ function ContainerLoadingsContent() {
             const result = await listContainerLoadings({ limit: 50 });
             setContainers(result.containers);
             setPagination(result.pagination);
-        } catch {
-            setError("Failed to load container data. Please try again.");
+        } catch (err: any) {
+            // 401 means the deployed backend still has auth on this public route.
+            // Show empty state rather than a hard error so the page is still usable.
+            if (err?.response?.status === 401) {
+                setContainers([]);
+            } else {
+                setError("Failed to load container data. Please try again.");
+            }
         } finally {
             setIsLoading(false);
         }
