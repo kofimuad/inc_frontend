@@ -185,6 +185,25 @@ export default function EmployeeDashboard() {
             )
         },
         {
+            header: "CBM",
+            accessor: "cbm",
+            render: (item: any) => (
+                item.cbm != null
+                    ? <span className="text-sm font-black text-slate-700 tabular-nums">{item.cbm} <span className="text-[10px] font-medium text-slate-400">m³</span></span>
+                    : <span className="text-slate-300 text-xs">—</span>
+            )
+        },
+        {
+            header: "ETA",
+            accessor: "estimatedDelivery",
+            render: (item: any) => {
+                const date = item.estimatedDelivery || item.receivingDate;
+                return date
+                    ? <span className="text-[10px] font-bold text-slate-500 tabular-nums">{new Date(date).toLocaleDateString('en-GB')}</span>
+                    : <span className="text-slate-300 text-xs">—</span>;
+            }
+        },
+        {
             header: "Date",
             accessor: "createdAt",
             render: (item: any) => (
