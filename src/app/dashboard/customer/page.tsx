@@ -3,22 +3,29 @@
 import Navbar from "@/components/common/Navbar";
 import StatsWidget from "@/components/dashboard/StatsWidget";
 import ShipmentCard from "@/components/dashboard/ShipmentCard";
-import { Package, Truck, CheckCircle, Clock, Search, Power, RefreshCw } from "lucide-react";
+import { Package, Truck, CheckCircle, Clock, Search, Power, RefreshCw, Phone, CheckCircle2 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { getMyShipments, getCustomerStats } from "@/services/shipments";
+import { linkPhone } from "@/services/auth";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/common/ProtectedRoute";
 
 // containerRef (physical container number) is not rendered anywhere in this
 // component. It is excluded at the API layer via PUBLIC_ITEM_SELECT.
 export default function CustomerDashboard() {
-  const { logout, user } = useAuth();
+  const { logout, user, fetchUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [shipments, setShipments] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'active' | 'history'>('active');
+
+  // Phone-link state
+  const [phoneInput, setPhoneInput] = useState("");
+  const [phoneSaving, setPhoneSaving] = useState(false);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [phoneSaved, setPhoneSaved] = useState(false);
 
   const fetchData = useCallback(async (isSilent = false) => {
     if (!isSilent) setIsLoading(true);
@@ -56,6 +63,22 @@ export default function CustomerDashboard() {
 
   const handleLogout = async () => {
     await logout();
+  };
+
+  const handleLinkPhone = async () => {
+    if (!phoneInput.trim()) return;
+    setPhoneSaving(true);
+    setPhoneError(null);
+    try {
+      await linkPhone(phoneInput.trim());
+      setPhoneSaved(true);
+      await fetchUser();
+      fetchData(true);
+    } catch (err: any) {
+      setPhoneError(err?.response?.data?.message || "Failed to link phone. Please try again.");
+    } finally {
+      setPhoneSaving(false);
+    }
   };
 
   // Format the next delivery date
@@ -117,6 +140,41 @@ export default function CustomerDashboard() {
                 </button>
               </div>
             </div>
+
+            {/* Phone-link banner — shown when account has no phone number */}
+            {user && !user.phone && !phoneSaved && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-8 flex flex-col sm:flex-row sm:items-center gap-4">
+                <Phone className="text-amber-500 shrink-0" size={22} />
+                <div className="grow">
+                  <p className="font-black text-amber-800 text-sm mb-0.5">Link your phone number to see your shipments</p>
+                  <p className="text-amber-600 text-xs font-medium">Your shipments are matched by phone. Enter the number you gave I&C Logistics.</p>
+                  {phoneError && <p className="text-red-500 text-xs mt-1 font-medium">{phoneError}</p>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <input
+                    type="tel"
+                    placeholder="e.g. 0241234567"
+                    value={phoneInput}
+                    onChange={(e) => setPhoneInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleLinkPhone()}
+                    className="px-3 py-2 border border-amber-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-300 w-40 bg-white"
+                  />
+                  <button
+                    onClick={handleLinkPhone}
+                    disabled={phoneSaving || !phoneInput.trim()}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-black rounded-xl transition-colors"
+                  >
+                    {phoneSaving ? "Saving…" : "Link"}
+                  </button>
+                </div>
+              </div>
+            )}
+            {phoneSaved && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-8 flex items-center gap-3">
+                <CheckCircle2 className="text-emerald-500 shrink-0" size={20} />
+                <p className="text-emerald-700 font-black text-sm">Phone linked! Your shipments are loading…</p>
+              </div>
+            )}
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
