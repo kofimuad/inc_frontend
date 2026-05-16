@@ -88,10 +88,9 @@ export default function Header() {
                                 <Image
                                     src="/assets/inc_logo.png"
                                     alt="I&C Shipping and Logistics"
-                                    width={240}
-                                    height={80}
-                                    className="w-auto h-12 lg:h-20 object-contain"
-                                    style={{ width: 'auto', height: 'auto' }}
+                                    width={160}
+                                    height={52}
+                                    className="h-8 w-auto lg:h-12 object-contain"
                                     priority
                                 />
                             </Link>
