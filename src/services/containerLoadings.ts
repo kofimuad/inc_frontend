@@ -1,4 +1,12 @@
+import axios from "axios";
 import api from "./api";
+
+// Plain axios instance for public endpoints — bypasses the auth token refresh
+// interceptors so unauthenticated visitors can still load container data.
+const publicApi = axios.create({
+    baseURL: process.env.NEXT_PUBLIC_API_URL,
+    headers: { "Content-Type": "application/json" },
+});
 
 export interface ContainerLoading {
     _id: string;
@@ -38,12 +46,12 @@ export interface ContainerSearchResult {
 }
 
 export async function listContainerLoadings(params?: { page?: number; limit?: number; status?: string }) {
-    const { data } = await api.get("/api/container-loadings", { params });
+    const { data } = await publicApi.get("/api/container-loadings", { params });
     return data.data as { containers: ContainerLoading[]; pagination: any };
 }
 
 export async function searchContainerLoadings(q: string) {
-    const { data } = await api.get("/api/container-loadings/search", { params: { q } });
+    const { data } = await publicApi.get("/api/container-loadings/search", { params: { q } });
     return data.data as ContainerSearchResult;
 }
 
