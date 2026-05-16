@@ -18,6 +18,7 @@ interface User {
 interface AuthContextType {
     user: User | null;
     login: (credentials: { email: string; password: string }) => Promise<void>;
+    loginWithToken: (tokenData: { accessToken: string; user: User }) => void;
     register: (userData: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
     logout: () => Promise<void>;
     fetchUser: () => Promise<void>;
@@ -89,6 +90,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    const loginWithToken = (tokenData: { accessToken: string; user: User }) => {
+        setAccessToken(tokenData.accessToken);
+        setUser(tokenData.user);
+    };
+
     const register = async (userData: { name: string; email: string; password: string; phone?: string }) => {
         try {
             setIsLoading(true);
@@ -122,14 +128,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        <AuthContext.Provider value={{ 
-            user, 
+        <AuthContext.Provider value={{
+            user,
             login,
+            loginWithToken,
             register,
-            logout, 
+            logout,
             fetchUser,
             isAuthenticated: !!user,
-            isLoading 
+            isLoading
         }}>
             {children}
         </AuthContext.Provider>
