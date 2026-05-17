@@ -70,6 +70,7 @@ function TrackingContent() {
                 const containerSearch = await searchContainerLoadings(num).catch(() => null);
                 const container = containerSearch?.waybillMatch?.container ?? null;
                 const containerItem = containerSearch?.waybillMatch?.item ?? null;
+                console.log('[INC DEBUG] containerItem for', num, JSON.stringify(containerItem, null, 2));
                 return {
                     trackingNumber: num,
                     shipment: shipmentData,
