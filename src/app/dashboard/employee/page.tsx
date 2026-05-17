@@ -1,7 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-
 import Navbar from "@/components/common/Navbar";
 import StatsWidget from "@/components/dashboard/StatsWidget";
 import DataTable from "@/components/dashboard/DataTable";
@@ -21,7 +19,6 @@ import ProtectedRoute from "@/components/common/ProtectedRoute";
 import { STATUS_COLORS } from "@/config/constants";
 
 export default function EmployeeDashboard() {
-    const router = useRouter();
     const { logout, user } = useAuth();
     const [shipments, setShipments] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -158,7 +155,13 @@ export default function EmployeeDashboard() {
                 </span>
             )
         },
-        { header: "Invoice #", accessor: "invoiceNo" },
+        {
+            header: "Invoice #",
+            accessor: "invoiceNo",
+            render: (item: any) => item.invoiceNo
+                ? <span className="text-sm font-mono text-slate-700">{item.invoiceNo}</span>
+                : <span className="text-slate-300 text-xs">—</span>
+        },
         {
             header: "Customer",
             accessor: "customerName",
@@ -197,7 +200,10 @@ export default function EmployeeDashboard() {
             header: "ETA",
             accessor: "estimatedDelivery",
             render: (item: any) => {
-                const date = item.estimatedDelivery || item.receivingDate;
+                const matchedContainer = item.containerRef
+                    ? containers.find((c) => c.containerNumber === item.containerRef)
+                    : null;
+                const date = item.estimatedDelivery || matchedContainer?.eta || item.receivingDate;
                 return date
                     ? <span className="text-[10px] font-bold text-slate-500 tabular-nums">{new Date(date).toLocaleDateString('en-GB')}</span>
                     : <span className="text-slate-300 text-xs">—</span>;

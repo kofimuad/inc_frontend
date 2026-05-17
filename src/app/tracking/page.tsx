@@ -70,7 +70,6 @@ function TrackingContent() {
                 const containerSearch = await searchContainerLoadings(num).catch(() => null);
                 const container = containerSearch?.waybillMatch?.container ?? null;
                 const containerItem = containerSearch?.waybillMatch?.item ?? null;
-                console.log('[INC DEBUG] containerItem for', num, JSON.stringify(containerItem, null, 2));
                 return {
                     trackingNumber: num,
                     shipment: shipmentData,
@@ -111,7 +110,7 @@ function TrackingContent() {
 
                         {/* Tracking Form */}
                         <form onSubmit={handleTrack} className="bg-white rounded-2xl p-2 flex flex-col sm:flex-row gap-2 shadow-2xl shadow-slate-200 border border-slate-100">
-                            <div className="relative flex-grow">
+                            <div className="relative grow">
                                 <Package className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                                 <input
                                     type="text"
