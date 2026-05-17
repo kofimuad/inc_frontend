@@ -7,6 +7,7 @@ import { useState } from "react";
 import { getPublicTracking } from "@/services/shipments";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { STATUS_COLORS, STATUS_LABELS } from "@/config/constants";
 
 const formatLocation = (loc: any) => {
     if (!loc) return "N/A";
@@ -206,15 +207,17 @@ function TrackingContent() {
                                             {foundResults.map((r, idx) => {
                                                 const s = r.shipment;
                                                 const tracking = s.waybillNo || s.trackingNumber || r.trackingNumber;
-                                                const dateReceived = s.receivedAt || s.dates?.receivedAt || s.createdAt;
-                                                const dateLoaded = s.loadingDate || s.shippedAt || s.dates?.shippedAt;
-                                                const cbm = s.cbm || s.cargo?.cbm;
-                                                const productName = s.productDescription || s.description || s.goodsType || "—";
-                                                const qty = s.quantity ?? s.itemsCount ?? 0;
-                                                const batchId = s.shippedBatch?._id || s.intakeBatch?._id || s._id || s.id || "";
+                                                const dateReceived = s.dates?.created || s.dates?.intakeDate || s.dates?.receivedAt || s.createdAt;
+                                                const dateLoaded = s.dates?.shippedAt || s.dates?.loadedAt || s.loadingDate || s.shippedAt;
+                                                const cbm = s.cargo?.cbm || s.cbm;
+                                                const productName = s.cargo?.description || s.cargo?.productDescription || s.productDescription || s.description || s.goodsType || "—";
+                                                const qty = s.cargo?.quantity ?? s.quantity ?? s.itemsCount ?? 0;
+                                                const batchId = s.batch?.intakeBatch || s.batch?.shippedBatch || s.shippedBatch?._id || s.intakeBatch?._id || s._id || s.id || "";
                                                 const container = s.containerRef || fakeContainerRef(batchId);
-                                                const eta = s.estimatedDelivery || s.dates?.estimatedDelivery || s.eta;
-                                                const statusLabel = getStatusDisplay(s.status?.code || s.status);
+                                                const eta = s.dates?.estimatedDelivery || s.estimatedDelivery || s.eta;
+                                                const statusCode = s.status?.code || s.status;
+                                                const statusLabel = STATUS_LABELS[statusCode] || getStatusDisplay(statusCode);
+                                                const statusBadge = STATUS_COLORS[statusCode] || STATUS_COLORS.default;
 
                                                 return (
                                                     <tr
@@ -234,7 +237,7 @@ function TrackingContent() {
                                                         <td className="px-6 py-5 text-sm font-bold text-[#039B81] font-mono whitespace-nowrap">{container}</td>
                                                         <td className="px-6 py-5 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">{formatDate(eta)}</td>
                                                         <td className="px-6 py-5">
-                                                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-[#039B81]/10 text-[#039B81]">
+                                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${statusBadge}`}>
                                                                 {statusLabel}
                                                             </span>
                                                         </td>
