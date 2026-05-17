@@ -44,6 +44,7 @@ type TrackResult = {
     trackingNumber: string;
     shipment: any | null;
     container: ContainerLoading | null;
+    containerItem: any | null;
     events: any[];
     found: boolean;
 };
@@ -68,10 +69,12 @@ function TrackingContent() {
                 // Fetch container data in parallel — silently ignore if not found
                 const containerSearch = await searchContainerLoadings(num).catch(() => null);
                 const container = containerSearch?.waybillMatch?.container ?? null;
+                const containerItem = containerSearch?.waybillMatch?.item ?? null;
                 return {
                     trackingNumber: num,
                     shipment: shipmentData,
                     container,
+                    containerItem,
                     events: shipmentData?.timeline || [],
                     found: true,
                 };
@@ -82,7 +85,7 @@ function TrackingContent() {
             settled.map((res, i) =>
                 res.status === "fulfilled"
                     ? res.value
-                    : { trackingNumber: numbers[i], shipment: null, container: null, events: [], found: false }
+                    : { trackingNumber: numbers[i], shipment: null, container: null, containerItem: null, events: [], found: false }
             )
         );
         setHasSearched(true);
@@ -214,15 +217,17 @@ function TrackingContent() {
                                             {foundResults.map((r, idx) => {
                                                 const s = r.shipment;
                                                 const c = r.container;
+                                                const ci = r.containerItem;
                                                 const tracking = s.waybillNo || s.trackingNumber || r.trackingNumber;
                                                 const dateReceived = s.dates?.created || s.dates?.intakeDate || s.dates?.receivedAt || s.createdAt;
                                                 // Date Loaded = container's loading date or ETD (departure from China)
                                                 const dateLoaded = c?.loadingDate || c?.etd || s.dates?.shippedAt || s.loadingDate;
-                                                const cbm = s.cargo?.cbm || s.cbm;
-                                                const productName = s.cargo?.description || s.cargo?.productDescription || s.productDescription || s.description || s.goodsType || "—";
+                                                // CBM: try container item first (has it even if public API omits it), then shipment fields
+                                                const cbm = ci?.cbm ?? s.cargo?.cbm ?? s.cbm ?? null;
+                                                const productName = ci?.productDescription || s.cargo?.description || s.cargo?.productDescription || s.productDescription || s.description || s.goodsType || "—";
                                                 const qty = s.cargo?.quantity ?? s.quantity ?? s.itemsCount ?? 0;
                                                 const batchId = s.batch?.intakeBatch || s.batch?.shippedBatch || s.shippedBatch?._id || s.intakeBatch?._id || s._id || s.id || "";
-                                                const containerNo = c?.containerNumber || s.containerRef || fakeContainerRef(batchId);
+                                                const containerNo = s.containerRef || fakeContainerRef(batchId);
                                                 // ETA comes from the container the shipment belongs to
                                                 const eta = c?.eta || s.dates?.estimatedDelivery || s.estimatedDelivery;
                                                 const statusCode = s.status?.code || s.status;
