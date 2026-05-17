@@ -5,6 +5,7 @@ import Footer from "@/components/common/Footer";
 import { Package, Search, Truck, CheckCircle, Clock, MapPin } from "lucide-react";
 import { useState } from "react";
 import { getPublicTracking } from "@/services/shipments";
+import { searchContainerLoadings, type ContainerLoading } from "@/services/containerLoadings";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { STATUS_COLORS, STATUS_LABELS } from "@/config/constants";
@@ -42,6 +43,7 @@ const getStatusDisplay = (status: string) => {
 type TrackResult = {
     trackingNumber: string;
     shipment: any | null;
+    container: ContainerLoading | null;
     events: any[];
     found: boolean;
 };
@@ -61,21 +63,26 @@ function TrackingContent() {
 
         setIsSearching(true);
         const settled = await Promise.allSettled(
-            numbers.map((num) =>
-                getPublicTracking(num).then((data) => ({
+            numbers.map(async (num) => {
+                const shipmentData = await getPublicTracking(num);
+                // Fetch container data in parallel — silently ignore if not found
+                const containerSearch = await searchContainerLoadings(num).catch(() => null);
+                const container = containerSearch?.waybillMatch?.container ?? null;
+                return {
                     trackingNumber: num,
-                    shipment: data,
-                    events: data?.timeline || [],
+                    shipment: shipmentData,
+                    container,
+                    events: shipmentData?.timeline || [],
                     found: true,
-                }))
-            )
+                };
+            })
         );
 
         setResults(
             settled.map((res, i) =>
                 res.status === "fulfilled"
                     ? res.value
-                    : { trackingNumber: numbers[i], shipment: null, events: [], found: false }
+                    : { trackingNumber: numbers[i], shipment: null, container: null, events: [], found: false }
             )
         );
         setHasSearched(true);
@@ -206,15 +213,18 @@ function TrackingContent() {
                                         <tbody>
                                             {foundResults.map((r, idx) => {
                                                 const s = r.shipment;
+                                                const c = r.container;
                                                 const tracking = s.waybillNo || s.trackingNumber || r.trackingNumber;
                                                 const dateReceived = s.dates?.created || s.dates?.intakeDate || s.dates?.receivedAt || s.createdAt;
-                                                const dateLoaded = s.dates?.shippedAt || s.dates?.loadedAt || s.loadingDate || s.shippedAt;
+                                                // Date Loaded = container's loading date or ETD (departure from China)
+                                                const dateLoaded = c?.loadingDate || c?.etd || s.dates?.shippedAt || s.loadingDate;
                                                 const cbm = s.cargo?.cbm || s.cbm;
                                                 const productName = s.cargo?.description || s.cargo?.productDescription || s.productDescription || s.description || s.goodsType || "—";
                                                 const qty = s.cargo?.quantity ?? s.quantity ?? s.itemsCount ?? 0;
                                                 const batchId = s.batch?.intakeBatch || s.batch?.shippedBatch || s.shippedBatch?._id || s.intakeBatch?._id || s._id || s.id || "";
-                                                const container = s.containerRef || fakeContainerRef(batchId);
-                                                const eta = s.dates?.estimatedDelivery || s.estimatedDelivery || s.eta;
+                                                const containerNo = c?.containerNumber || s.containerRef || fakeContainerRef(batchId);
+                                                // ETA comes from the container the shipment belongs to
+                                                const eta = c?.eta || s.dates?.estimatedDelivery || s.estimatedDelivery;
                                                 const statusCode = s.status?.code || s.status;
                                                 const statusLabel = STATUS_LABELS[statusCode] || getStatusDisplay(statusCode);
                                                 const statusBadge = STATUS_COLORS[statusCode] || STATUS_COLORS.default;
@@ -234,7 +244,7 @@ function TrackingContent() {
                                                         <td className="px-6 py-5">
                                                             <span className="text-sm font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">{qty}</span>
                                                         </td>
-                                                        <td className="px-6 py-5 text-sm font-bold text-[#039B81] font-mono whitespace-nowrap">{container}</td>
+                                                        <td className="px-6 py-5 text-sm font-bold text-[#039B81] font-mono whitespace-nowrap">{containerNo}</td>
                                                         <td className="px-6 py-5 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">{formatDate(eta)}</td>
                                                         <td className="px-6 py-5">
                                                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${statusBadge}`}>
