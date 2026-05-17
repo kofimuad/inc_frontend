@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Search, Package } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
 
 const sliderImages = [
     "/assets/inc.JPG",
@@ -17,7 +16,6 @@ const sliderImages = [
 export default function HeroSection() {
     const [trackingNumber, setTrackingNumber] = useState("");
     const [currentIndex, setCurrentIndex] = useState(0);
-    const { isAuthenticated } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
@@ -31,11 +29,7 @@ export default function HeroSection() {
     const handleTrack = (e: React.FormEvent) => {
         e.preventDefault();
         if (!trackingNumber.trim()) return;
-        if (isAuthenticated) {
-            router.push(`/tracking?q=${encodeURIComponent(trackingNumber)}`);
-        } else {
-            router.push(`/auth/login?redirect=/tracking&tracking=${encodeURIComponent(trackingNumber)}`);
-        }
+        router.push(`/tracking?q=${encodeURIComponent(trackingNumber)}`);
     };
 
     return (
