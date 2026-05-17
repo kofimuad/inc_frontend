@@ -8,13 +8,30 @@ import { getPublicTracking } from "@/services/shipments";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
-// Format a Location object { address, city, country } to a readable string
 const formatLocation = (loc: any) => {
     if (!loc) return "N/A";
     if (typeof loc === 'string') return loc;
     const parts = [loc.city, loc.country].filter(Boolean);
     return parts.join(', ') || loc.address || "N/A";
 };
+
+function formatDate(date?: string | Date | null): string {
+    if (!date) return "—";
+    try {
+        return new Date(date).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+        });
+    } catch {
+        return "—";
+    }
+}
+
+function fakeContainerRef(id: string): string {
+    if (!id) return "ICL-PENDING";
+    return "ICL-" + id.slice(-6).toUpperCase();
+}
 
 // Map status to timeline props
 const getStatusDisplay = (status: string) => {
@@ -120,42 +137,67 @@ function TrackingContent() {
                         </div>
                     )}
 
-                    {result === "found" && shipment && (
-                        <div className="max-w-4xl mx-auto">
-                            {/* Status Overview */}
-                            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-8">
-                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+                    {result === "found" && shipment && (() => {
+                        const tracking = shipment.waybillNo || shipment.trackingNumber || "—";
+                        const dateReceived = shipment.receivedAt || shipment.dates?.receivedAt || shipment.createdAt;
+                        const dateLoaded = shipment.loadingDate || shipment.shippedAt || shipment.dates?.shippedAt;
+                        const cbm = shipment.cbm || shipment.cargo?.cbm;
+                        const productName = shipment.productDescription || shipment.description || shipment.goodsType || "—";
+                        const qty = shipment.quantity ?? shipment.itemsCount ?? 0;
+                        const batchId = shipment.shippedBatch?._id || shipment.intakeBatch?._id || shipment._id || shipment.id || "";
+                        const container = fakeContainerRef(batchId);
+                        const eta = shipment.estimatedDelivery || shipment.dates?.estimatedDelivery || shipment.eta;
+                        const statusLabel = getStatusDisplay(shipment.status?.code || shipment.status);
+
+                        return (
+                        <div className="max-w-5xl mx-auto">
+                            {/* Shipment Table */}
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 mb-8 overflow-hidden">
+                                <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                     <div>
-                                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5">Tracking Number</p>
-                                        <p className="text-2xl font-black text-slate-800 tracking-tight">{shipment.waybillNo || shipment.trackingNumber}</p>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tracking Number</p>
+                                        <p className="text-xl font-black text-slate-800 tracking-tight font-mono">{tracking}</p>
                                     </div>
-                                    <div className="flex items-center gap-2 px-4 py-2 bg-[#039B81]/10 rounded-xl justify-center">
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-[#039B81]/10 rounded-xl self-start sm:self-auto">
                                         <div className="w-2 h-2 bg-[#039B81] rounded-full animate-pulse" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-[#039B81]">{getStatusDisplay(shipment.status?.code || shipment.status)}</span>
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-[#039B81]">{statusLabel}</span>
                                     </div>
                                 </div>
-
-                                <div className="grid md:grid-cols-4 gap-4">
-                                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Origin</p>
-                                        <p className="font-semibold text-sm text-slate-800">{formatLocation(shipment.route?.origin || shipment.origin) || shipment.originCity || "N/A"}</p>
-                                    </div>
-                                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Destination</p>
-                                        <p className="font-semibold text-sm text-slate-800">{formatLocation(shipment.route?.destination || shipment.destination) || shipment.route?.destinationCity || shipment.destinationCity || "N/A"}</p>
-                                    </div>
-                                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Est. Delivery</p>
-                                        <p className="font-semibold text-sm text-slate-800">
-                                            {(shipment.dates?.estimatedDelivery || shipment.estimatedDelivery)
-                                                ? new Date(shipment.dates?.estimatedDelivery || shipment.estimatedDelivery).toLocaleDateString()
-                                                : 'TBD'}
-                                        </p>
-                                    </div>
-                                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Weight</p>
-                                        <p className="font-semibold text-sm text-slate-800">{(shipment.cargo?.weight || shipment.weight) ? `${shipment.cargo?.weight || shipment.weight} kg` : 'N/A'}</p>
-                                    </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-slate-50/60">
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">Date Received</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">Date Loaded</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">CBM</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">Product Name</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">Packages</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">Container No.</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">ETA</th>
+                                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr className="hover:bg-slate-50/60 transition-colors">
+                                                <td className="px-6 py-5 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">{formatDate(dateReceived)}</td>
+                                                <td className="px-6 py-5 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">{formatDate(dateLoaded)}</td>
+                                                <td className="px-6 py-5 text-sm font-bold text-slate-700 tabular-nums">
+                                                    {cbm != null ? <>{cbm} <span className="text-[10px] font-medium text-slate-400">m³</span></> : <span className="text-slate-300">—</span>}
+                                                </td>
+                                                <td className="px-6 py-5 text-sm font-medium text-slate-700 max-w-[200px] truncate" title={productName}>{productName}</td>
+                                                <td className="px-6 py-5">
+                                                    <span className="text-sm font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">{qty}</span>
+                                                </td>
+                                                <td className="px-6 py-5 text-sm font-bold text-[#039B81] font-mono">{container}</td>
+                                                <td className="px-6 py-5 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">{formatDate(eta)}</td>
+                                                <td className="px-6 py-5">
+                                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-[#039B81]/10 text-[#039B81]">
+                                                        {statusLabel}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
 
@@ -215,7 +257,8 @@ function TrackingContent() {
                                 )}
                             </div>
                         </div>
-                    )}
+                    );
+                    })()}
                 </div>
             </section>
         </main>

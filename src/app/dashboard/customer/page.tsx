@@ -332,6 +332,9 @@ export default function CustomerDashboard() {
                             Tracking Number
                           </th>
                           <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                            Date Received
+                          </th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
                             Date Loaded
                           </th>
                           <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
@@ -350,6 +353,9 @@ export default function CustomerDashboard() {
                             Container No.
                           </th>
                           <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                            ETA
+                          </th>
+                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
                             Status
                           </th>
                         </tr>
@@ -359,11 +365,18 @@ export default function CustomerDashboard() {
                           const id = s._id || s.id || String(idx);
                           const tracking =
                             s.waybillNo || s.trackingNumber || "—";
+                          const dateReceived =
+                            s.receivedAt ||
+                            s.dates?.receivedAt ||
+                            s.createdAt;
                           const dateLoaded =
                             s.loadingDate ||
                             s.shippedAt ||
-                            s.dates?.shippedAt ||
-                            s.createdAt;
+                            s.dates?.shippedAt;
+                          const eta =
+                            s.estimatedDelivery ||
+                            s.dates?.estimatedDelivery ||
+                            s.eta;
                           const cbm = s.cbm;
                           const fee =
                             cbm != null ? cbm * settings.cbmRate : null;
@@ -390,6 +403,9 @@ export default function CustomerDashboard() {
                             >
                               <td className="px-6 py-4 text-sm font-bold text-slate-800 font-mono">
                                 {tracking}
+                              </td>
+                              <td className="px-6 py-4 text-sm font-medium text-slate-600 tabular-nums">
+                                {formatDate(dateReceived)}
                               </td>
                               <td className="px-6 py-4 text-sm font-medium text-slate-600 tabular-nums">
                                 {formatDate(dateLoaded)}
@@ -431,6 +447,9 @@ export default function CustomerDashboard() {
                               </td>
                               <td className="px-6 py-4 text-sm font-bold text-[#039B81] font-mono">
                                 {container}
+                              </td>
+                              <td className="px-6 py-4 text-sm font-medium text-slate-600 tabular-nums">
+                                {formatDate(eta)}
                               </td>
                               <td className="px-6 py-4">
                                 <span
