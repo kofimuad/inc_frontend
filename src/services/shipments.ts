@@ -16,6 +16,7 @@ import {
 export const getPublicTracking = async (trackingNumber: string) => {
     const { data: envelope } = await api.get(`/api/tracking/${trackingNumber}`);
     const raw = envelope.data;
+    console.log('[INC DEBUG] raw envelope.data:', JSON.stringify(raw, null, 2));
     // Backend returns { shipment: {...}, events: [...] } — unwrap so callers get a flat shipment object
     if (raw?.shipment) {
         return { ...raw.shipment, timeline: raw.timeline ?? raw.events ?? [] };
