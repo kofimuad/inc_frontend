@@ -212,7 +212,7 @@ function TrackingContent() {
                                                 const productName = s.productDescription || s.description || s.goodsType || "—";
                                                 const qty = s.quantity ?? s.itemsCount ?? 0;
                                                 const batchId = s.shippedBatch?._id || s.intakeBatch?._id || s._id || s.id || "";
-                                                const container = fakeContainerRef(batchId);
+                                                const container = s.containerRef || fakeContainerRef(batchId);
                                                 const eta = s.estimatedDelivery || s.dates?.estimatedDelivery || s.eta;
                                                 const statusLabel = getStatusDisplay(s.status?.code || s.status);
 

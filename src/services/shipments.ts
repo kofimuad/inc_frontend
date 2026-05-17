@@ -1,9 +1,7 @@
 import api from './api';
-import { 
-    ShipmentItem, 
-    NewShipmentPayload, 
-    CheckpointPayload, 
-    PaginatedResponse 
+import {
+    NewShipmentPayload,
+    CheckpointPayload,
 } from '@/types/shipment';
 
 // ═══════════════════════════════════════════════════
@@ -17,7 +15,12 @@ import {
  */
 export const getPublicTracking = async (trackingNumber: string) => {
     const { data: envelope } = await api.get(`/api/tracking/${trackingNumber}`);
-    return envelope.data;
+    const raw = envelope.data;
+    // Backend returns { shipment: {...}, events: [...] } — unwrap so callers get a flat shipment object
+    if (raw?.shipment) {
+        return { ...raw.shipment, timeline: raw.timeline ?? raw.events ?? [] };
+    }
+    return raw;
 };
 
 /**
