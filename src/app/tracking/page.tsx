@@ -205,18 +205,18 @@ function TrackingContent() {
           {/* All not found */}
           {hasSearched && foundResults.length === 0 && (
             <div className="max-w-2xl mx-auto text-center py-12">
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Package className="text-red-500" size={32} />
+              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Clock className="text-amber-500" size={32} />
               </div>
               <h2 className="text-2xl font-black text-slate-800 mb-2 tracking-tight">
-                No Shipments Found
+                Not Received Yet
               </h2>
               <p className="text-slate-500 font-medium mb-6">
-                We couldn't find any shipments for{" "}
+                We have not received any shipment for{" "}
                 <span className="font-bold">
                   "{notFoundNumbers.join('", "')}"
-                </span>
-                . Please check the numbers and try again.
+                </span>{" "}
+                yet. Your package may still be on its way to our warehouse.
               </p>
               <p className="text-sm text-slate-400 font-medium">
                 If you believe this is an error, please{" "}
@@ -233,7 +233,7 @@ function TrackingContent() {
 
           {/* Results */}
           {hasSearched && foundResults.length > 0 && (
-            <div className="max-w-5xl mx-auto">
+            <div className="w-full">
               {/* Partial not-found warning */}
               {notFoundNumbers.length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 mb-6 flex items-start gap-3">
@@ -242,7 +242,7 @@ function TrackingContent() {
                     size={18}
                   />
                   <p className="text-sm font-medium text-amber-800">
-                    <span className="font-black">Not found: </span>
+                    <span className="font-black">Not received yet: </span>
                     {notFoundNumbers.join(", ")}
                   </p>
                 </div>
@@ -264,34 +264,34 @@ function TrackingContent() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50/60">
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
-                          Tracking No.
-                        </th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
-                          Date Received
-                        </th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
-                          Date Loaded
-                        </th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
-                          CBM
-                        </th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
-                          Product Name
-                        </th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
-                          Packages
-                        </th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
                           Shipping Mark
                         </th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                          Tracking No.
+                        </th>
+                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                          Product Name
+                        </th>
+                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                          Qty
+                        </th>
+                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                          CBM
+                        </th>
+                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                          Date Received
+                        </th>
+                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                          Date Loaded
+                        </th>
+                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
                           Container No.
                         </th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
                           ETA
                         </th>
-                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
                           Status
                         </th>
                       </tr>
@@ -326,14 +326,17 @@ function TrackingContent() {
                           "—";
                         const qty =
                           s.cargo?.quantity ?? s.quantity ?? s.itemsCount ?? 0;
-                        const shippingMark =
+                        const shippingMarkName =
                           ci?.customerName ||
                           s.customerName ||
+                          s.cargo?.customerName ||
+                          "—";
+                        const shippingMarkPhone =
                           s.customerPhoneRaw ||
                           s.customerPhone ||
-                          s.cargo?.customerName ||
+                          ci?.customerPhone ||
                           s.cargo?.customerPhone ||
-                          "—";
+                          "";
                         const batchId =
                           s.batch?.intakeBatch ||
                           s.batch?.shippedBatch ||
@@ -361,16 +364,26 @@ function TrackingContent() {
                             key={r.trackingNumber}
                             className={`hover:bg-slate-50/60 transition-colors ${idx !== foundResults.length - 1 ? "border-b border-slate-50" : ""}`}
                           >
-                            <td className="px-6 py-5 text-sm font-bold text-slate-800 font-mono whitespace-nowrap">
+                            <td className="px-4 py-4 text-sm text-slate-700 min-w-40">
+                              <span className="font-medium block">{shippingMarkName}</span>
+                              {shippingMarkPhone && (
+                                <span className="text-xs text-slate-400 font-mono">{shippingMarkPhone}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4 text-sm font-bold text-slate-800 font-mono whitespace-nowrap">
                               {tracking}
                             </td>
-                            <td className="px-6 py-5 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">
-                              {formatDate(dateReceived)}
+                            <td className="px-4 py-4 text-sm font-medium text-slate-700 min-w-35"
+                              title={productName}
+                            >
+                              {productName}
                             </td>
-                            <td className="px-6 py-5 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">
-                              {formatDate(dateLoaded)}
+                            <td className="px-4 py-4">
+                              <span className="text-sm font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
+                                {qty}
+                              </span>
                             </td>
-                            <td className="px-6 py-5 text-sm font-bold text-slate-700 tabular-nums">
+                            <td className="px-4 py-4 text-sm font-bold text-slate-700 tabular-nums whitespace-nowrap">
                               {cbm != null ? (
                                 <>
                                   {cbm}{" "}
@@ -382,30 +395,19 @@ function TrackingContent() {
                                 <span className="text-slate-300">—</span>
                               )}
                             </td>
-                            <td
-                              className="px-6 py-5 text-sm font-medium text-slate-700 max-w-50 truncate"
-                              title={productName}
-                            >
-                              {productName}
+                            <td className="px-4 py-4 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">
+                              {formatDate(dateReceived)}
                             </td>
-                            <td className="px-6 py-5">
-                              <span className="text-sm font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
-                                {qty}
-                              </span>
+                            <td className="px-4 py-4 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">
+                              {formatDate(dateLoaded)}
                             </td>
-                            <td
-                              className="px-6 py-5 text-sm font-medium text-slate-700 max-w-44 truncate"
-                              title={shippingMark}
-                            >
-                              {shippingMark}
-                            </td>
-                            <td className="px-6 py-5 text-sm font-bold text-[#039B81] font-mono whitespace-nowrap">
+                            <td className="px-4 py-4 text-sm font-bold text-[#039B81] font-mono whitespace-nowrap">
                               {containerNo}
                             </td>
-                            <td className="px-6 py-5 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">
+                            <td className="px-4 py-4 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">
                               {formatDate(eta)}
                             </td>
-                            <td className="px-6 py-5">
+                            <td className="px-4 py-4">
                               <span
                                 className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${statusBadge}`}
                               >
