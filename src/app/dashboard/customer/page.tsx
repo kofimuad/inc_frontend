@@ -328,34 +328,37 @@ export default function CustomerDashboard() {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50/60">
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                            Shipping Mark
+                          </th>
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
                             Tracking Number
                           </th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
-                            Date Received
-                          </th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
-                            Date Loaded
-                          </th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
-                            CBM
-                          </th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
-                            Shipping Fee (USD)
-                          </th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
                             Product Name
                           </th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
-                            Packages
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                            Qty
                           </th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                            CBM
+                          </th>
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                            Shipping Fee (USD)
+                          </th>
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                            Date Received
+                          </th>
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                            Date Loaded
+                          </th>
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
                             Container No.
                           </th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
                             ETA
                           </th>
-                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
+                          <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] border-b border-slate-100">
                             Status
                           </th>
                         </tr>
@@ -386,7 +389,6 @@ export default function CustomerDashboard() {
                             s.goodsType ||
                             "—";
                           const qty = s.quantity ?? s.itemsCount ?? 0;
-                          // Use the batch _id so all items in the same shipment batch share the same fake ref
                           const batchId = s.shippedBatch?._id || s.intakeBatch?._id || id;
                           const container = fakeContainerRef(batchId);
                           const statusKey = s.status || "pending";
@@ -395,22 +397,37 @@ export default function CustomerDashboard() {
                           const statusLabel =
                             STATUS_LABELS[statusKey] ||
                             statusKey.replace(/_/g, " ");
+                          const shippingMarkName =
+                            s.customerName || s.shippingMark || user?.name || "—";
+                          const shippingMarkPhone =
+                            s.customerPhone || s.customerPhoneRaw || user?.phone || "";
 
                           return (
                             <tr
                               key={id}
                               className={`hover:bg-slate-50/60 transition-colors ${idx !== filteredShipments.length - 1 ? "border-b border-slate-50" : ""}`}
                             >
-                              <td className="px-6 py-4 text-sm font-bold text-slate-800 font-mono">
+                              <td className="px-4 py-4 text-sm text-slate-700 min-w-40">
+                                <span className="font-medium block">{shippingMarkName}</span>
+                                {shippingMarkPhone && (
+                                  <span className="text-xs text-slate-400 font-mono">{shippingMarkPhone}</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-4 text-sm font-bold text-slate-800 font-mono whitespace-nowrap">
                                 {tracking}
                               </td>
-                              <td className="px-6 py-4 text-sm font-medium text-slate-600 tabular-nums">
-                                {formatDate(dateReceived)}
+                              <td
+                                className="px-4 py-4 text-sm font-medium text-slate-700 min-w-35"
+                                title={productName}
+                              >
+                                {productName}
                               </td>
-                              <td className="px-6 py-4 text-sm font-medium text-slate-600 tabular-nums">
-                                {formatDate(dateLoaded)}
+                              <td className="px-4 py-4">
+                                <span className="text-sm font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
+                                  {qty}
+                                </span>
                               </td>
-                              <td className="px-6 py-4 text-sm font-bold text-slate-700 tabular-nums">
+                              <td className="px-4 py-4 text-sm font-bold text-slate-700 tabular-nums whitespace-nowrap">
                                 {cbm != null ? (
                                   <>
                                     {cbm}{" "}
@@ -422,7 +439,7 @@ export default function CustomerDashboard() {
                                   <span className="text-slate-300">—</span>
                                 )}
                               </td>
-                              <td className="px-6 py-4 text-sm font-black text-slate-800 tabular-nums">
+                              <td className="px-4 py-4 text-sm font-black text-slate-800 tabular-nums whitespace-nowrap">
                                 {fee != null ? (
                                   <>
                                     <span className="text-[#039B81]">$</span>
@@ -434,24 +451,19 @@ export default function CustomerDashboard() {
                                   </span>
                                 )}
                               </td>
-                              <td
-                                className="px-6 py-4 text-sm font-medium text-slate-700 max-w-[220px] truncate"
-                                title={productName}
-                              >
-                                {productName}
+                              <td className="px-4 py-4 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">
+                                {formatDate(dateReceived)}
                               </td>
-                              <td className="px-6 py-4">
-                                <span className="text-sm font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
-                                  {qty}
-                                </span>
+                              <td className="px-4 py-4 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">
+                                {formatDate(dateLoaded)}
                               </td>
-                              <td className="px-6 py-4 text-sm font-bold text-[#039B81] font-mono">
+                              <td className="px-4 py-4 text-sm font-bold text-[#039B81] font-mono whitespace-nowrap">
                                 {container}
                               </td>
-                              <td className="px-6 py-4 text-sm font-medium text-slate-600 tabular-nums">
+                              <td className="px-4 py-4 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">
                                 {formatDate(eta)}
                               </td>
-                              <td className="px-6 py-4">
+                              <td className="px-4 py-4">
                                 <span
                                   className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${statusBadge}`}
                                 >
