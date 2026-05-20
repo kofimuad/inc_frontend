@@ -10,14 +10,20 @@ import { getSettings, AppSettings } from "@/services/settings";
 
 // ─── Status badge ──────────────────────────────────────────────────────────────
 const STATUS_STYLES: Record<string, string> = {
-    in_warehouse: "bg-blue-50 text-blue-700",
-    shipped: "bg-[#039B81]/10 text-[#039B81]",
-    held: "bg-amber-50 text-amber-700",
+    in_warehouse:    "bg-blue-50 text-blue-700",
+    shipped:         "bg-[#039B81]/10 text-[#039B81]",
+    customs:         "bg-purple-50 text-purple-700",
+    out_for_delivery:"bg-orange-50 text-orange-700",
+    delivered:       "bg-emerald-50 text-emerald-700",
+    held:            "bg-amber-50 text-amber-700",
 };
 const STATUS_LABELS: Record<string, string> = {
-    in_warehouse: "In Warehouse",
-    shipped: "Shipped",
-    held: "On Hold",
+    in_warehouse:    "In Warehouse",
+    shipped:         "Shipped",
+    customs:         "Customs",
+    out_for_delivery:"Out for Delivery",
+    delivered:       "Delivered",
+    held:            "On Hold",
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -64,7 +70,7 @@ function CalculatorContent() {
     const [phone, setPhone] = useState("");
     const [phoneTouched, setPhoneTouched] = useState(false);
     const [lookupState, setLookupState] = useState<"idle" | "loading" | "found" | "not-found" | "error">("idle");
-    const [grouped, setGrouped] = useState<{ in_warehouse: any[]; shipped: any[]; held: any[] } | null>(null);
+    const [grouped, setGrouped] = useState<Record<string, any[]> | null>(null);
     const [selected, setSelected] = useState<any | null>(null);
     const [settings, setSettings] = useState<AppSettings>({ cbmRate: 230, usdToGhsRate: 15.2 });
     const [copied, setCopied] = useState(false);
@@ -75,9 +81,7 @@ function CalculatorContent() {
             .catch(() => {}); // fall back to defaults silently
     }, []);
 
-    const allItems = grouped
-        ? [...(grouped.in_warehouse ?? []), ...(grouped.shipped ?? []), ...(grouped.held ?? [])]
-        : [];
+    const allItems = grouped ? Object.values(grouped).flat() : [];
 
     const handleLookup = async (e: React.FormEvent) => {
         e.preventDefault();

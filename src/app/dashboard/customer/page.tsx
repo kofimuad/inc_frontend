@@ -72,7 +72,7 @@ export default function CustomerDashboard() {
         getSettings().catch(() => ({ cbmRate: 230, usdToGhsRate: 15.2 })),
       ]);
 
-      // API returns { total, grouped: { in_warehouse, shipped, held }, pagination }
+      // API returns { total, grouped: { in_warehouse, shipped, customs, out_for_delivery, delivered, held }, pagination }
       // Flatten grouped object into a single array so .length / .filter / .map work correctly.
       let items: any[] = [];
       if (Array.isArray(shipmentsData)) {
