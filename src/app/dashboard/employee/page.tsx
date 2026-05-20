@@ -158,23 +158,33 @@ export default function EmployeeDashboard() {
         {
             header: "Invoice #",
             accessor: "invoiceNo",
-            render: (item: any) => item.invoiceNo
-                ? <span className="text-sm font-mono text-slate-700">{item.invoiceNo}</span>
-                : <span className="text-slate-300 text-xs">—</span>
+            render: (item: any) => {
+                if (item._grouped) return <span className="text-slate-200 text-xs select-none">↳</span>;
+                return item.invoiceNo
+                    ? <span className="text-sm font-mono text-slate-700">{item.invoiceNo}</span>
+                    : <span className="text-slate-300 text-xs">—</span>;
+            }
         },
         {
             header: "Customer",
             accessor: "customerName",
-            render: (item: any) => (
-                <div className="flex flex-col gap-0.5">
-                    <span className="text-sm font-semibold text-slate-800">{item.customerName || <span className="text-slate-300 italic text-xs">No name</span>}</span>
-                    {item.customerPhoneRaw || item.customerPhone ? (
-                        <span className="text-[11px] font-mono text-slate-400">{item.customerPhoneRaw || item.customerPhone}</span>
-                    ) : (
-                        <span className="text-[11px] text-amber-400 font-bold">No phone</span>
-                    )}
-                </div>
-            )
+            render: (item: any) => {
+                if (item._grouped) return (
+                    <span className="text-[11px] font-mono text-slate-300 italic select-none pl-1">
+                        {item.customerPhoneRaw || item.customerPhone || ""}
+                    </span>
+                );
+                return (
+                    <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-semibold text-slate-800">{item.customerName || <span className="text-slate-300 italic text-xs">No name</span>}</span>
+                        {item.customerPhoneRaw || item.customerPhone ? (
+                            <span className="text-[11px] font-mono text-slate-400">{item.customerPhoneRaw || item.customerPhone}</span>
+                        ) : (
+                            <span className="text-[11px] text-amber-400 font-bold">No phone</span>
+                        )}
+                    </div>
+                );
+            }
         },
         { header: "Description", accessor: "productDescription" },
         { header: "Destination", accessor: "destinationCity" },
@@ -257,7 +267,12 @@ export default function EmployeeDashboard() {
         }
     ];
 
-    const filteredShipments = shipments; // Server-side filtered already
+    // Annotate each row so renders know when a customer's packages span multiple rows.
+    // Consecutive rows sharing the same customerPhone are treated as one group.
+    const filteredShipments = shipments.map((s: any, idx: number) => ({
+      ...s,
+      _grouped: idx > 0 && shipments[idx - 1].customerPhone === s.customerPhone,
+    }));
 
     return (
         <ProtectedRoute allowedRoles={['employee', 'admin']}>
