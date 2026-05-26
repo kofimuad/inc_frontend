@@ -20,7 +20,7 @@ export default function SystemSettingsModal({ onClose }: SystemSettingsModalProp
     const [loading, setLoading] = useState(false);
     const [cleanupResult, setCleanupResult] = useState<any>(null);
     const [cleanupLoading, setCleanupLoading] = useState(false);
-    const [rates, setRates] = useState<AppSettings>({ cbmRate: 230, usdToGhsRate: 15.2 });
+    const [rates, setRates] = useState<AppSettings>({ cbmRate: 230, usdToGhsRate: 15.2, minFeeUsd: 3 });
     const [ratesSaving, setRatesSaving] = useState(false);
     const [ratesSaved, setRatesSaved] = useState(false);
     const [ratesError, setRatesError] = useState<string | null>(null);
@@ -328,7 +328,7 @@ function PlatformConfigView({ onRunCleanup, cleanupLoading, cleanupResult, rates
                     <DollarSign size={16} className="text-[#039B81]" />
                     Shipping Rates
                 </h3>
-                <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                <div className="grid sm:grid-cols-3 gap-4 mb-4">
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                             Rate per CBM (USD)
@@ -360,6 +360,23 @@ function PlatformConfigView({ onRunCleanup, cleanupLoading, cleanupResult, rates
                                 className={`${rateCls} pl-12`}
                             />
                         </div>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                            Minimum Fee (USD)
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">$</span>
+                            <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={rates.minFeeUsd}
+                                onChange={(e) => onRatesChange({ ...rates, minFeeUsd: parseFloat(e.target.value) || 0 })}
+                                className={`${rateCls} pl-8`}
+                            />
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1.5">Applied when calculated fee falls below this amount.</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-4">

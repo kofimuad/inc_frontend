@@ -3,6 +3,7 @@ import api from './api';
 export interface AppSettings {
     cbmRate: number;
     usdToGhsRate: number;
+    minFeeUsd: number;
 }
 
 export const getSettings = async (): Promise<AppSettings> => {

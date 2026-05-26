@@ -50,6 +50,7 @@ export default function CustomerDashboard() {
   const [settings, setSettings] = useState<AppSettings>({
     cbmRate: 230,
     usdToGhsRate: 15.2,
+    minFeeUsd: 3,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -69,7 +70,7 @@ export default function CustomerDashboard() {
       const [shipmentsData, statsData, settingsData] = await Promise.all([
         getMyShipments(),
         getCustomerStats(),
-        getSettings().catch(() => ({ cbmRate: 230, usdToGhsRate: 15.2 })),
+        getSettings().catch(() => ({ cbmRate: 230, usdToGhsRate: 15.2, minFeeUsd: 3 })),
       ]);
 
       // API returns { total, grouped: { in_warehouse, shipped, customs, out_for_delivery, delivered, held }, pagination }
