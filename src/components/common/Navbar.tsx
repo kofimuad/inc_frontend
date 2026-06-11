@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X, ArrowUpRight, Globe, TrendingUp, LogOut, LayoutDashboard } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { getTickerItems, TickerItem } from "@/utils/ticker";
 
 const navLinks = [
     { name: "Home", href: "/" },
@@ -16,19 +17,11 @@ const navLinks = [
     { name: "Contact", href: "/contact" },
 ];
 
-const tickerItems = [
-    { type: "news", text: "Port of Tema expands capacity for 2026 shipments." },
-    { type: "rate", text: "USD: 12.45 GHC" },
-    { type: "news", text: "New direct shipping route from Shenzhen to Accra launched." },
-    { type: "rate", text: "EUR: 13.52 GHC" },
-    { type: "news", text: "I&C Logistics wins 'Best Clearing Agent' award." },
-    { type: "rate", text: "RMB: 1.72 GHC" },
-    { type: "news", text: "Holiday Schedule: Port operations remain open 24/7." },
-];
 
 export default function Header() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
+    const [tickerItems, setTickerItems] = useState<TickerItem[]>([]);
     const pathname = usePathname();
     const { user, isAuthenticated, logout } = useAuth();
 
@@ -39,6 +32,14 @@ export default function Header() {
         : user?.role === "employee"
             ? "/dashboard/employee"
             : "/dashboard/customer";
+
+    useEffect(() => {
+        // Load ticker items on mount and whenever admin updates them
+        const load = () => setTickerItems(getTickerItems());
+        load();
+        window.addEventListener("ticker-updated", load);
+        return () => window.removeEventListener("ticker-updated", load);
+    }, []);
 
     useEffect(() => {
         const handleScroll = () => {

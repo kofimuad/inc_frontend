@@ -2,16 +2,24 @@
 
 import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
-import { Phone, Mail, MapPin, Clock, Send } from "lucide-react";
+import { Phone, Mail, MapPin, Clock, Send, MessageCircle, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { submitContact } from "@/services/contact";
+
+const phoneDepartments = [
+    { label: "Update Department", number: "+233 54 901 4200" },
+    { label: "Invoice Department", number: "+233 55 216 1900" },
+    { label: "Accra Warehouse", number: "+233 54 900 9957" },
+    { label: "Kumasi Warehouse", number: "+233 59 197 6752" },
+    { label: "Air Cargo", number: "+233 54 486 8482" },
+];
 
 const contactInfo = [
     {
         icon: Phone,
-        title: "Phone",
-        details: ["+233 XX XXX XXXX", "+233 XX XXX XXXX"],
-        action: "tel:+233000000000",
+        title: "Phone Lines",
+        details: ["+233 54 901 4200", "+233 55 216 1900"],
+        action: "tel:+233549014200",
     },
     {
         icon: Mail,
@@ -22,13 +30,13 @@ const contactInfo = [
     {
         icon: MapPin,
         title: "Address",
-        details: ["123 Shipping Lane", "Accra, Ghana"],
-        action: "#",
+        details: ["Accra Warehouse", "Kumasi Warehouse"],
+        action: "#phone-lines",
     },
     {
         icon: Clock,
         title: "Working Hours",
-        details: ["Mon - Fri: 8:00 AM - 6:00 PM", "Sat: 9:00 AM - 2:00 PM"],
+        details: ["Mon – Fri: 8:00 AM – 6:00 PM", "Sat: 9:00 AM – 2:00 PM"],
         action: "#",
     },
 ];
@@ -44,6 +52,13 @@ export default function ContactPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [successMsg, setSuccessMsg] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
+    const [copiedNumber, setCopiedNumber] = useState<string | null>(null);
+
+    const handleCopy = (number: string) => {
+        navigator.clipboard.writeText(number);
+        setCopiedNumber(number);
+        setTimeout(() => setCopiedNumber(null), 2000);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -75,19 +90,17 @@ export default function ContactPage() {
         <>
             <Navbar />
             <main>
-                {/* Hero Section */}
+                {/* Hero */}
                 <section className="pt-32 pb-10 bg-white shadow-sm">
                     <div className="container mx-auto px-4 text-center">
-                        <h1 className="text-3xl md:text-4xl font-bold text-black mb-4">
-                            Contact Us
-                        </h1>
+                        <h1 className="text-3xl md:text-4xl font-bold text-black mb-4">Contact Us</h1>
                         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                            Have questions? We'd love to hear from you. Get in touch with our team.
+                            Have questions? We&apos;d love to hear from you. Get in touch with our team.
                         </p>
                     </div>
                 </section>
 
-                {/* Contact Info Cards */}
+                {/* Quick Info Cards */}
                 <section className="py-12 bg-white">
                     <div className="container mx-auto px-4">
                         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -110,7 +123,77 @@ export default function ContactPage() {
                     </div>
                 </section>
 
-                {/* Contact Form & Map */}
+                {/* Official Phone Numbers */}
+                <section id="phone-lines" className="py-10 bg-gray-50">
+                    <div className="container mx-auto px-4 max-w-4xl">
+                        <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+                            <div className="bg-[#039B81] px-6 py-4 flex items-center gap-3">
+                                <Phone className="text-white" size={22} />
+                                <h2 className="text-white font-bold text-xl">Official Phone Numbers</h2>
+                            </div>
+                            <div className="divide-y divide-gray-100">
+                                {phoneDepartments.map((dept, idx) => (
+                                    <div key={idx} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors">
+                                        <div>
+                                            <p className="text-gray-500 text-xs uppercase font-semibold mb-0.5">{dept.label}</p>
+                                            <a
+                                                href={`tel:${dept.number.replace(/\s/g, "")}`}
+                                                className="text-gray-900 font-mono font-semibold text-base hover:text-[#039B81] transition-colors"
+                                            >
+                                                {dept.number}
+                                            </a>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <a
+                                                href={`tel:${dept.number.replace(/\s/g, "")}`}
+                                                className="p-2 bg-[#039B81]/10 hover:bg-[#039B81]/20 text-[#039B81] rounded-full transition-colors"
+                                                title="Call"
+                                            >
+                                                <Phone size={16} />
+                                            </a>
+                                            <button
+                                                onClick={() => handleCopy(dept.number)}
+                                                className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-full transition-colors text-xs font-semibold"
+                                                title="Copy number"
+                                            >
+                                                {copiedNumber === dept.number ? (
+                                                    <span className="text-green-600">✓</span>
+                                                ) : (
+                                                    <span>Copy</span>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* WhatsApp Channel */}
+                        <div className="mt-6 bg-[#25D366] rounded-2xl shadow-md overflow-hidden">
+                            <div className="px-6 py-5 flex items-center justify-between flex-wrap gap-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-white/20 p-3 rounded-full">
+                                        <MessageCircle className="text-white" size={28} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-bold text-lg">WhatsApp Channel</h3>
+                                        <p className="text-white/80 text-sm">Follow I&C Shipping &amp; Logistics 🇨🇳🇬🇭 for updates</p>
+                                    </div>
+                                </div>
+                                <a
+                                    href="https://whatsapp.com/channel/0029VbAo4TQAzNbn6WIMfO3R"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 bg-white text-[#25D366] font-bold px-5 py-2.5 rounded-full hover:bg-gray-50 transition-colors text-sm shadow"
+                                >
+                                    Follow Channel <ExternalLink size={14} />
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Contact Form & Info */}
                 <section className="py-16 bg-gray-50">
                     <div className="container mx-auto px-4">
                         <div className="grid lg:grid-cols-2 gap-12">
@@ -127,7 +210,7 @@ export default function ContactPage() {
                                                 value={formData.name}
                                                 onChange={handleChange}
                                                 required
-                                                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#1d4ed8] focus:border-transparent outline-none transition"
+                                                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#039B81] focus:border-transparent outline-none transition"
                                                 placeholder="John Doe"
                                             />
                                         </div>
@@ -139,7 +222,7 @@ export default function ContactPage() {
                                                 value={formData.email}
                                                 onChange={handleChange}
                                                 required
-                                                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#1d4ed8] focus:border-transparent outline-none transition"
+                                                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#039B81] focus:border-transparent outline-none transition"
                                                 placeholder="john@example.com"
                                             />
                                         </div>
@@ -152,7 +235,7 @@ export default function ContactPage() {
                                                 name="phone"
                                                 value={formData.phone}
                                                 onChange={handleChange}
-                                                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#1d4ed8] focus:border-transparent outline-none transition"
+                                                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#039B81] focus:border-transparent outline-none transition"
                                                 placeholder="+233 XX XXX XXXX"
                                             />
                                         </div>
@@ -163,7 +246,7 @@ export default function ContactPage() {
                                                 value={formData.subject}
                                                 onChange={handleChange}
                                                 required
-                                                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#1d4ed8] focus:border-transparent outline-none transition"
+                                                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#039B81] focus:border-transparent outline-none transition"
                                             >
                                                 <option value="">Select a subject</option>
                                                 <option value="quote">Get a Quote</option>
@@ -182,7 +265,7 @@ export default function ContactPage() {
                                             onChange={handleChange}
                                             required
                                             rows={5}
-                                            className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#1d4ed8] focus:border-transparent outline-none transition resize-none"
+                                            className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#039B81] focus:border-transparent outline-none transition resize-none"
                                             placeholder="How can we help you?"
                                         />
                                     </div>
@@ -191,7 +274,7 @@ export default function ContactPage() {
                                     <button
                                         type="submit"
                                         disabled={isSubmitting}
-                                        className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-[#FC6100] hover:bg-[#E05500] disabled:bg-slate-300 text-white font-semibold rounded-lg transition-colors"
+                                        className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-[#039B81] hover:bg-[#026b5a] focus:bg-[#026b5a] disabled:bg-slate-300 text-white font-semibold rounded-lg transition-colors"
                                     >
                                         {isSubmitting ? (
                                             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -203,21 +286,58 @@ export default function ContactPage() {
                                 </form>
                             </div>
 
-                            {/* Map Placeholder */}
-                            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                                <div className="h-full min-h-[400px] bg-gray-200 flex items-center justify-center">
-                                    <div className="text-center p-8">
-                                        <MapPin className="text-[#1d4ed8] mx-auto mb-4" size={48} />
-                                        <h3 className="text-xl font-semibold text-gray-800 mb-2">Our Location</h3>
-                                        <p className="text-gray-600 mb-4">123 Shipping Lane, Accra, Ghana</p>
-                                        <a
-                                            href="https://maps.google.com"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-2 text-[#1d4ed8] hover:underline"
-                                        >
-                                            View on Google Maps
-                                        </a>
+                            {/* Location Info */}
+                            <div className="space-y-6">
+                                <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                                    <div className="bg-gray-800 px-6 py-4">
+                                        <h3 className="text-white font-bold text-lg">Ghana Offices</h3>
+                                    </div>
+                                    <div className="p-6 space-y-4">
+                                        <div className="flex items-start gap-3">
+                                            <MapPin className="text-[#039B81] mt-1 flex-shrink-0" size={18} />
+                                            <div>
+                                                <p className="font-semibold text-gray-800">Accra Warehouse</p>
+                                                <p className="text-gray-600 text-sm">Accra, Ghana</p>
+                                                <a href="tel:+233549009957" className="text-[#039B81] text-sm font-mono hover:underline">+233 54 900 9957</a>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            <MapPin className="text-[#FC6100] mt-1 flex-shrink-0" size={18} />
+                                            <div>
+                                                <p className="font-semibold text-gray-800">Kumasi Warehouse</p>
+                                                <p className="text-gray-600 text-sm">Kumasi, Ghana</p>
+                                                <a href="tel:+233591976752" className="text-[#FC6100] text-sm font-mono hover:underline">+233 59 197 6752</a>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            <MapPin className="text-blue-500 mt-1 flex-shrink-0" size={18} />
+                                            <div>
+                                                <p className="font-semibold text-gray-800">Air Cargo Office</p>
+                                                <p className="text-gray-600 text-sm">Accra, Ghana</p>
+                                                <a href="tel:+233544868482" className="text-blue-500 text-sm font-mono hover:underline">+233 54 486 8482</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-2xl p-6 shadow-sm">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <Clock className="text-[#039B81]" size={20} />
+                                        <h3 className="font-bold text-gray-800 text-lg">Working Hours</h3>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-600">Monday – Friday</span>
+                                            <span className="font-semibold text-gray-800">8:00 AM – 6:00 PM</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-600">Saturday</span>
+                                            <span className="font-semibold text-gray-800">9:00 AM – 2:00 PM</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-600">Sunday</span>
+                                            <span className="font-semibold text-gray-500">Closed</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

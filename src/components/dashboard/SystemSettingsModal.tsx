@@ -1,17 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Activity, Cpu, Settings, RefreshCw, ShieldCheck, Globe, Mail, DollarSign, Save, Check } from "lucide-react";
+import { X, Activity, Cpu, Settings, RefreshCw, ShieldCheck, Globe, Mail, DollarSign, Save, Check, Newspaper, Plus, Trash2, GripVertical, TrendingUp } from "lucide-react";
 import DataTable from "./DataTable";
 import Button from "@/components/common/Button";
 import { getAuditLogs, getGpsDevices, triggerCleanup } from "@/services/admin";
 import { getSettings, updateSettings, AppSettings } from "@/services/settings";
+import { getTickerItems, saveTickerItems, generateId, TickerItem, DEFAULT_TICKER_ITEMS } from "@/utils/ticker";
 
 interface SystemSettingsModalProps {
     onClose: () => void;
 }
 
-type TabType = 'logs' | 'devices' | 'config';
+type TabType = 'logs' | 'devices' | 'config' | 'ticker';
 
 export default function SystemSettingsModal({ onClose }: SystemSettingsModalProps) {
     const [activeTab, setActiveTab] = useState<TabType>('logs');
@@ -24,9 +25,12 @@ export default function SystemSettingsModal({ onClose }: SystemSettingsModalProp
     const [ratesSaving, setRatesSaving] = useState(false);
     const [ratesSaved, setRatesSaved] = useState(false);
     const [ratesError, setRatesError] = useState<string | null>(null);
+    const [tickerItems, setTickerItems] = useState<TickerItem[]>([]);
+    const [tickerSaved, setTickerSaved] = useState(false);
 
     useEffect(() => {
         getSettings().then(setRates).catch(() => {});
+        setTickerItems(getTickerItems());
     }, []);
 
     const handleSaveRates = async () => {
@@ -183,6 +187,12 @@ export default function SystemSettingsModal({ onClose }: SystemSettingsModalProp
                         label="GPS Hardware"
                     />
                     <TabButton 
+                        active={activeTab === 'ticker'} 
+                        onClick={() => setActiveTab('ticker')}
+                        icon={Newspaper}
+                        label="News Ticker"
+                    />
+                    <TabButton 
                         active={activeTab === 'config'} 
                         onClick={() => setActiveTab('config')}
                         icon={ShieldCheck}
@@ -209,6 +219,18 @@ export default function SystemSettingsModal({ onClose }: SystemSettingsModalProp
                                 <DataTable 
                                     columns={deviceColumns}
                                     data={devices}
+                                />
+                            )}
+                            {activeTab === 'ticker' && (
+                                <TickerTab
+                                    items={tickerItems}
+                                    onChange={setTickerItems}
+                                    onSave={() => {
+                                        saveTickerItems(tickerItems);
+                                        setTickerSaved(true);
+                                        setTimeout(() => setTickerSaved(false), 2500);
+                                    }}
+                                    saved={tickerSaved}
                                 />
                             )}
                             {activeTab === 'config' && (
@@ -418,6 +440,241 @@ function PlatformConfigView({ onRunCleanup, cleanupLoading, cleanupResult, rates
                             {cleanupResult.success
                                 ? `Done — removed ${cleanupResult.data?.auditLogs ?? 0} audit logs, ${cleanupResult.data?.refreshTokens ?? 0} tokens, ${cleanupResult.data?.gpsPings ?? 0} GPS pings`
                                 : 'Cleanup failed. Check server logs.'}
+                        </p>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── TickerTab ──
+function TickerTab({
+    items,
+    onChange,
+    onSave,
+    saved,
+}: {
+    items: TickerItem[];
+    onChange: (items: TickerItem[]) => void;
+    onSave: () => void;
+    saved: boolean;
+}) {
+    const [newText, setNewText] = useState("");
+    const [newType, setNewType] = useState<"news" | "rate">("news");
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editText, setEditText] = useState("");
+
+    const handleAdd = () => {
+        const trimmed = newText.trim();
+        if (!trimmed) return;
+        onChange([...items, { id: generateId(), type: newType, text: trimmed }]);
+        setNewText("");
+    };
+
+    const handleDelete = (id: string) => {
+        onChange(items.filter((item) => item.id !== id));
+    };
+
+    const handleEdit = (item: TickerItem) => {
+        setEditingId(item.id);
+        setEditText(item.text);
+    };
+
+    const handleEditSave = (id: string) => {
+        const trimmed = editText.trim();
+        if (!trimmed) return;
+        onChange(items.map((item) => (item.id === id ? { ...item, text: trimmed } : item)));
+        setEditingId(null);
+        setEditText("");
+    };
+
+    const handleToggleType = (id: string) => {
+        onChange(
+            items.map((item) =>
+                item.id === id ? { ...item, type: item.type === "news" ? "rate" : "news" } : item
+            )
+        );
+    };
+
+    const handleMoveUp = (idx: number) => {
+        if (idx === 0) return;
+        const arr = [...items];
+        [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
+        onChange(arr);
+    };
+
+    const handleMoveDown = (idx: number) => {
+        if (idx === items.length - 1) return;
+        const arr = [...items];
+        [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]];
+        onChange(arr);
+    };
+
+    const handleReset = () => {
+        onChange(DEFAULT_TICKER_ITEMS.map((item) => ({ ...item })));
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-1 flex items-center gap-2">
+                    <Newspaper size={16} className="text-[#039B81]" />
+                    News Ticker Items
+                </h3>
+                <p className="text-[10px] text-slate-400 mb-6">
+                    Manage the scrolling items in the top ticker bar. Click a type badge to toggle between News and Rate. Click text to edit inline. Changes apply site-wide after saving.
+                </p>
+
+                {/* Add new item */}
+                <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                    <select
+                        value={newType}
+                        onChange={(e) => setNewType(e.target.value as "news" | "rate")}
+                        className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 transition-all shrink-0"
+                    >
+                        <option value="news">🌐 News</option>
+                        <option value="rate">📈 Rate</option>
+                    </select>
+                    <input
+                        type="text"
+                        value={newText}
+                        onChange={(e) => setNewText(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                        placeholder='e.g. "USD: 15.5 GHC" or "New Accra route launched..."'
+                        className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 transition-all"
+                    />
+                    <button
+                        onClick={handleAdd}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-[#039B81] text-white rounded-xl font-bold text-sm hover:bg-[#027a65] transition-colors shrink-0"
+                    >
+                        <Plus size={16} />
+                        Add
+                    </button>
+                </div>
+
+                {/* Items list */}
+                <div className="space-y-2">
+                    {items.length === 0 && (
+                        <div className="text-center py-8 text-slate-400 text-sm">
+                            No ticker items. Add one above.
+                        </div>
+                    )}
+                    {items.map((item, idx) => (
+                        <div
+                            key={item.id}
+                            className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 group"
+                        >
+                            {/* Move up */}
+                            <button
+                                onClick={() => handleMoveUp(idx)}
+                                disabled={idx === 0}
+                                className="text-slate-300 hover:text-slate-600 disabled:opacity-20 transition-colors shrink-0"
+                                title="Move up"
+                            >
+                                <GripVertical size={14} />
+                            </button>
+
+                            {/* Type badge / toggle */}
+                            <button
+                                onClick={() => handleToggleType(item.id)}
+                                title="Click to toggle type"
+                                className={`shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${
+                                    item.type === "news"
+                                        ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                        : "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                                }`}
+                            >
+                                {item.type === "news" ? (
+                                    <><Globe size={10} /> news</>
+                                ) : (
+                                    <><TrendingUp size={10} /> rate</>
+                                )}
+                            </button>
+
+                            {/* Text — inline edit */}
+                            {editingId === item.id ? (
+                                <input
+                                    autoFocus
+                                    value={editText}
+                                    onChange={(e) => setEditText(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") handleEditSave(item.id);
+                                        if (e.key === "Escape") setEditingId(null);
+                                    }}
+                                    className="flex-1 px-3 py-1.5 bg-white border border-[#039B81]/40 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#039B81]/20"
+                                />
+                            ) : (
+                                <span
+                                    className="flex-1 text-sm text-slate-700 cursor-text"
+                                    onClick={() => handleEdit(item)}
+                                    title="Click to edit"
+                                >
+                                    {item.text}
+                                </span>
+                            )}
+
+                            {/* Confirm edit / edit button */}
+                            {editingId === item.id ? (
+                                <button
+                                    onClick={() => handleEditSave(item.id)}
+                                    className="shrink-0 p-1.5 text-[#039B81] hover:bg-[#039B81]/10 rounded-lg transition-colors"
+                                    title="Save edit"
+                                >
+                                    <Check size={16} />
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => handleEdit(item)}
+                                    className="shrink-0 p-1.5 text-slate-400 hover:text-[#039B81] hover:bg-[#039B81]/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                    title="Edit"
+                                >
+                                    <Settings size={14} />
+                                </button>
+                            )}
+
+                            {/* Delete */}
+                            <button
+                                onClick={() => handleDelete(item.id)}
+                                className="shrink-0 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                title="Delete"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+
+                            {/* Move down */}
+                            <button
+                                onClick={() => handleMoveDown(idx)}
+                                disabled={idx === items.length - 1}
+                                className="text-slate-300 hover:text-slate-600 disabled:opacity-20 transition-colors shrink-0 rotate-180"
+                                title="Move down"
+                            >
+                                <GripVertical size={14} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Footer actions */}
+                <div className="flex items-center gap-3 mt-6 pt-4 border-t border-slate-100">
+                    <Button
+                        onClick={onSave}
+                        className="px-6 py-2.5 text-[10px] font-black uppercase tracking-widest shadow-md shadow-[#039B81]/20"
+                    >
+                        {saved ? <Check size={14} className="mr-2" /> : <Save size={14} className="mr-2" />}
+                        {saved ? "Saved!" : "Save to Ticker"}
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={handleReset}
+                        className="px-6 py-2.5 text-[10px] font-black uppercase tracking-widest"
+                    >
+                        <RefreshCw size={14} className="mr-2" />
+                        Reset Defaults
+                    </Button>
+                    {saved && (
+                        <p className="text-xs font-semibold text-emerald-600 ml-2">
+                            ✓ Ticker updated — visible to all visitors immediately.
                         </p>
                     )}
                 </div>
