@@ -177,7 +177,7 @@ export default function ContactPage() {
                                     </div>
                                     <div>
                                         <h3 className="text-white font-bold text-lg">WhatsApp Channel</h3>
-                                        <p className="text-white/80 text-sm">Follow I&C Shipping &amp; Logistics 🇨🇳🇬🇭 for updates</p>
+                                        <p className="text-white/80 text-sm">Follow Clinette Shipping &amp; Logistics 🇨🇳🇬🇭 for updates</p>
                                     </div>
                                 </div>
                                 <a

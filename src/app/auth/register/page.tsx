@@ -81,7 +81,7 @@ export default function RegisterPage() {
                 <div className="flex-grow flex flex-col justify-center max-w-md w-full mx-auto">
                     <div className="mb-10 text-center text-gray-800">
                         <h1 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">Create Account</h1>
-                        <p className="text-gray-500 text-sm">Join I&C Shipping & Logistics by creating an account.</p>
+                        <p className="text-gray-500 text-sm">Join Clinette Shipping & Logistics by creating an account.</p>
                     </div>
 
                     {error && (
@@ -216,7 +216,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="mt-12 pt-8 text-xs text-gray-400 font-medium tracking-tight text-center">
-                    © 2026 I&C Shipping & Logistics. All rights reserved.
+                    © 2026 Clinette Shipping & Logistics. All rights reserved.
                 </div>
             </div>
 
@@ -225,8 +225,8 @@ export default function RegisterPage() {
                 <AuthSlider />
                 <div className="absolute top-8 right-8 z-20 opacity-50">
                     <Image
-                        src="/assets/inc_logo.png"
-                        alt="I&C Logo"
+                        src="/assets/clinette_logo.jpg"
+                        alt="Clinette Logo"
                         width={180}
                         height={60}
                         className="object-contain"

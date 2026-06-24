@@ -15,7 +15,7 @@ const addresses = [
             { label: "Full Address (Chinese)", value: "广东省佛山市南海区里水镇甘蕉上街工业区金辉工业园15号楼一楼" },
             { label: "Contact Person", value: "刘先生" },
             { label: "Phone", value: "19878765606" },
-            { label: "Agent", value: "I&C CARGO" },
+            { label: "Agent", value: "CLINETTE CARGO" },
         ],
         shippingMark: {
             label: "Shipping Mark Format",
@@ -30,7 +30,7 @@ const addresses = [
         accentColor: "#FC6100",
         fields: [
             { label: "Full Address (Chinese)", value: "浙江省东阳市江北街道歌山北路280号蓝鸟冷库6号荷园仓库-转伟成" },
-            { label: "Contact Person", value: "张召 转伟成（I&C LOGISTICS）" },
+            { label: "Contact Person", value: "张召 转伟成（CLINETTE LOGISTICS）" },
             { label: "Phone", value: "17757965609" },
             { label: "Agent", value: "IC CARGO + 深圳伟成" },
         ],
@@ -54,7 +54,7 @@ const addresses = [
             { label: "Full Address (Chinese)", value: "广州市越秀区广园西路66号壹号都汇钟表城4018室空运" },
             { label: "Contact Person", value: "蒋小姐" },
             { label: "Phone", value: "19924759953" },
-            { label: "Agent", value: "I&C CARGO" },
+            { label: "Agent", value: "CLINETTE CARGO" },
         ],
         shippingMark: null,
         warning: null,
@@ -65,7 +65,7 @@ const addresses = [
         type: "air",
         accentColor: "#039B81",
         fields: [
-            { label: "Agent", value: "I&C Cargo (Office)" },
+            { label: "Agent", value: "Clinette Cargo (Office)" },
             { label: "Name", value: "Aqcosuah" },
             { label: "Contact", value: "0594788071" },
             { label: "Location", value: "TAMALE-TAM | TAKORADI-TKD | KUMASI-KSI | ACCRA-ACC" },

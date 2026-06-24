@@ -9,7 +9,7 @@ export const DEFAULT_TICKER_ITEMS: TickerItem[] = [
     { id: "2", type: "rate", text: "USD: 12.45 GHC" },
     { id: "3", type: "news", text: "New direct shipping route from Shenzhen to Accra launched." },
     { id: "4", type: "rate", text: "EUR: 13.52 GHC" },
-    { id: "5", type: "news", text: "I&C Logistics wins 'Best Clearing Agent' award." },
+    { id: "5", type: "news", text: "Clinette Logistics wins 'Best Clearing Agent' award." },
     { id: "6", type: "rate", text: "RMB: 1.72 GHC" },
     { id: "7", type: "news", text: "Holiday Schedule: Port operations remain open 24/7." },
 ];

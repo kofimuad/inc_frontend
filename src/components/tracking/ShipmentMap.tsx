@@ -57,7 +57,7 @@ const ShipmentMap: React.FC<ShipmentMapProps> = ({
             
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <p className="text-slate-300 font-bold uppercase tracking-[1em] text-4xl opacity-20 -rotate-12">
-                    I&C LOGISTICS
+                    CLINETTE LOGISTICS
                 </p>
             </div>
         </div>

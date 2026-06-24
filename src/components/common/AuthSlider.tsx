@@ -7,7 +7,7 @@ const AuthSlider = () => (
         <div className="absolute inset-0 opacity-70">
             <Image
                 src="/assets/Shipping-from-China-to-Ghana.webp"
-                alt="I&C Logistics"
+                alt="Clinette Logistics"
                 fill
                 className="object-cover"
                 priority

@@ -11,8 +11,8 @@ const ubuntu = Ubuntu({
 });
 
 export const metadata: Metadata = {
-  title: "I&C Shipping and Logistics | Your Trusted Freight Partner",
-  description: "I&C Shipping and Logistics offers reliable air freight, ocean freight, customs clearance, and procurement services. Track your shipments and get quotes today.",
+  title: "Clinette Shipping & Logistics | Your Trusted Freight Partner",
+  description: "Clinette Shipping & Logistics offers reliable air freight, ocean freight, customs clearance, and procurement services. Track your shipments and get quotes today.",
 };
 
 export default function RootLayout({

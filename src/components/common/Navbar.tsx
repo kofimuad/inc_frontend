@@ -94,11 +94,11 @@ export default function Header() {
                             {/* Logo */}
                             <Link href="/" className="flex items-center gap-3">
                                 <Image
-                                    src="/assets/inc_logo.png"
-                                    alt="I&C Shipping and Logistics"
+                                    src="/assets/clinette_logo.jpg"
+                                    alt="Clinette Shipping & Logistics"
                                     width={160}
                                     height={52}
-                                    className="h-8 w-auto lg:h-12 object-contain"
+                                    className="w-24 md:w-32 lg:w-40 h-auto object-contain"
                                     priority
                                 />
                             </Link>

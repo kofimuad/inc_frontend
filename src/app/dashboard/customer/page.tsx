@@ -216,7 +216,7 @@ export default function CustomerDashboard() {
                   </p>
                   <p className="text-amber-600 text-xs font-medium">
                     Your shipments are matched by phone. Enter the number you
-                    gave I&C Logistics.
+                    gave Clinette Logistics.
                   </p>
                   {phoneError && (
                     <p className="text-red-500 text-xs mt-1 font-medium">

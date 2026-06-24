@@ -304,7 +304,7 @@ function PlatformConfigView({ onRunCleanup, cleanupLoading, cleanupResult, rates
                 <div className="space-y-4">
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Display Name</label>
-                        <input disabled className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-400 cursor-not-allowed" defaultValue="I&C Shipping" title="Read-only — contact support to update" />
+                        <input disabled className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-400 cursor-not-allowed" defaultValue="Clinette Shipping" title="Read-only — contact support to update" />
                     </div>
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Support Email</label>

@@ -32,10 +32,16 @@ export default function AboutPage() {
                                     Who Are We?
                                 </h1>
                                 <p className="text-gray-600 text-lg mb-6 leading-relaxed">
-                                    I&C Shipping and Logistics is your trusted partner for seamless global shipping solutions. Since 2014, we have been bridging the gap between China and Ghana, delivering excellence in every package.
+                                    At Clinette Shipping & Logistics™, we are committed to providing reliable, efficient, and customer-focused shipping solutions that connect businesses and individuals across international markets. We specialize in freight forwarding, cargo consolidation, procurement support, repackaging, and end-to-end logistics services designed to make global shipping simple and stress-free.
+                                </p>
+                                <p className="text-gray-600 text-lg mb-6 leading-relaxed">
+                                    With a strong focus on transparency, professionalism, and timely delivery, we help our clients move goods from overseas suppliers to their final destination with confidence. Whether you are importing personal effects, commercial cargo, furniture, electronics, event equipment, or wholesale goods, our experienced team ensures that every shipment is handled with care and attention to detail.
+                                </p>
+                                <p className="text-gray-600 text-lg mb-6 leading-relaxed">
+                                    At Clinette Shipping, we understand that every shipment represents an investment. That is why we provide regular updates, responsive customer support, and tailored logistics solutions to meet the unique needs of each client. Our commitment to excellence has earned us the trust of businesses, entrepreneurs, and families who rely on us for dependable shipping services.
                                 </p>
                                 <p className="text-gray-600 text-lg mb-8 leading-relaxed">
-                                    Our commitment to reliability, transparency, and customer satisfaction has made us a leader in the logistics industry. We handle your cargo with care, ensuring it reaches its destination safely and on time.
+                                    Our mission is to simplify international trade and logistics by delivering secure, affordable, and efficient shipping solutions while building lasting relationships with our customers through integrity, accountability, and exceptional service.
                                 </p>
 
                                 {/* Social Proof */}

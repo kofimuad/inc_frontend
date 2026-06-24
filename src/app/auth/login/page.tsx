@@ -409,14 +409,14 @@ export default function LoginPage() {
                 </Suspense>
 
                 <div className="mt-12 pt-8 text-xs text-gray-400 font-medium tracking-tight text-center">
-                    © 2026 I&C Shipping &amp; Logistics. All rights reserved.
+                    © 2026 Clinette Shipping &amp; Logistics. All rights reserved.
                 </div>
             </div>
 
             <div className="hidden md:block md:w-1/2 relative bg-slate-900 overflow-hidden md:h-full">
                 <AuthSlider />
                 <div className="absolute top-8 right-8 z-20 opacity-50">
-                    <Image src="/assets/inc_logo.png" alt="I&C Logo" width={180} height={60} className="object-contain" style={{ width: "auto", height: "auto" }} sizes="180px" />
+                    <Image src="/assets/clinette_logo.jpg" alt="Clinette Logo" width={180} height={60} className="object-contain" style={{ width: "auto", height: "auto" }} sizes="180px" />
                 </div>
             </div>
         </main>

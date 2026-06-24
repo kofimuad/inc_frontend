@@ -206,7 +206,7 @@ function CalculatorContent() {
         const feeGhs = feeUsd * settings.usdToGhsRate;
         const isMinimum = feeUsd > calculated;
         return [
-            "I&C Shipping and Logistics — Cost Estimate",
+            "Clinette Shipping & Logistics — Cost Estimate",
             "",
             ...(mode === "lookup" && selected
                 ? [`Waybill: ${selected.waybillNo || selected.invoiceNo || "—"}`]
@@ -459,7 +459,7 @@ function CalculatorContent() {
                                             settings={settings}
                                             sublabel={
                                                 mode === "lookup"
-                                                    ? "Measured and confirmed by I&C at the origin warehouse."
+                                                    ? "Measured and confirmed by Clinette at the origin warehouse."
                                                     : undefined
                                             }
                                             copied={copied}
