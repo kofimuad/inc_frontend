@@ -2,7 +2,8 @@
 
 import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
-import { Phone, Mail, MapPin, Clock, Send, MessageCircle, ExternalLink } from "lucide-react";
+import { Phone, Send, ExternalLink, MapPin, Clock } from "lucide-react";
+import Image from "next/image";
 import { useState } from "react";
 import { submitContact } from "@/services/contact";
 
@@ -16,25 +17,25 @@ const phoneDepartments = [
 
 const contactInfo = [
     {
-        icon: Phone,
+        icon: "/assets/phone.png",
         title: "Phone Lines",
         details: ["+233 54 901 4200", "+233 55 216 1900"],
         action: "tel:+233549014200",
     },
     {
-        icon: Mail,
+        icon: "/assets/email.png",
         title: "Email",
         details: ["info@incshipping.com", "support@incshipping.com"],
         action: "mailto:info@incshipping.com",
     },
     {
-        icon: MapPin,
+        icon: "/assets/location.png",
         title: "Address",
         details: ["Accra Warehouse", "Kumasi Warehouse"],
         action: "#phone-lines",
     },
     {
-        icon: Clock,
+        icon: "/assets/business.png",
         title: "Working Hours",
         details: ["Mon – Fri: 8:00 AM – 6:00 PM", "Sat: 9:00 AM – 2:00 PM"],
         action: "#",
@@ -110,8 +111,8 @@ export default function ContactPage() {
                                     href={info.action}
                                     className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow text-center"
                                 >
-                                    <div className="w-14 h-14 bg-[#039B81]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <info.icon className="text-[#039B81]" size={28} />
+                                    <div className="w-14 h-14 bg-[#039B81]/10 rounded-full flex items-center justify-center mx-auto mb-4 p-2.5">
+                                        <Image src={info.icon} alt={info.title} width={32} height={32} className="w-full h-full object-contain" />
                                     </div>
                                     <h3 className="text-lg font-semibold text-gray-800 mb-2">{info.title}</h3>
                                     {info.details.map((detail, idx) => (
@@ -172,8 +173,8 @@ export default function ContactPage() {
                         <div className="mt-6 bg-[#25D366] rounded-2xl shadow-md overflow-hidden">
                             <div className="px-6 py-5 flex items-center justify-between flex-wrap gap-4">
                                 <div className="flex items-center gap-4">
-                                    <div className="bg-white/20 p-3 rounded-full">
-                                        <MessageCircle className="text-white" size={28} />
+                                    <div className="bg-white/20 p-2.5 rounded-full w-14 h-14 flex items-center justify-center">
+                                        <Image src="/assets/whatsapp.png" alt="WhatsApp" width={32} height={32} className="w-full h-full object-contain" />
                                     </div>
                                     <div>
                                         <h3 className="text-white font-bold text-lg">WhatsApp Channel</h3>

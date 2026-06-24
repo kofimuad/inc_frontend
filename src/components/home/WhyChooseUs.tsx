@@ -1,25 +1,25 @@
 "use client";
 
-import { CheckCircle, Shield, Clock, HeadphonesIcon } from "lucide-react";
+import Image from "next/image";
 
 const features = [
     {
-        icon: CheckCircle,
+        icon: "/assets/review.png",
         title: "Reliable Service",
         description: "Consistent on-time deliveries with real-time tracking for complete transparency.",
     },
     {
-        icon: Shield,
+        icon: "/assets/patronage.png",
         title: "Secure Handling",
         description: "Your cargo is protected with our comprehensive insurance and secure facilities.",
     },
     {
-        icon: Clock,
+        icon: "/assets/courier-services.png",
         title: "Fast Delivery",
         description: "Optimized routes and efficient processes ensure your shipments arrive quickly.",
     },
     {
-        icon: HeadphonesIcon,
+        icon: "/assets/customer-support.png",
         title: "24/7 Support",
         description: "Our dedicated team is always available to assist you with any inquiries.",
     },
@@ -42,8 +42,8 @@ export default function WhyChooseUs() {
                     {features.map((feature) => (
                         <div key={feature.title} className="flex gap-4 p-6 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors">
                             <div className="flex-shrink-0">
-                                <div className="w-12 h-12 bg-[#039B81]/10 rounded-xl flex items-center justify-center">
-                                    <feature.icon className="text-[#039B81]" size={24} />
+                                <div className="w-12 h-12 bg-[#039B81]/10 rounded-xl flex items-center justify-center p-2">
+                                    <Image src={feature.icon} alt={feature.title} width={32} height={32} className="w-full h-full object-contain" />
                                 </div>
                             </div>
                             <div className="text-left">

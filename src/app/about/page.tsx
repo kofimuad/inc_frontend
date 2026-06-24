@@ -2,7 +2,7 @@
 
 import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
-import { Target, Eye, Users, Award, Globe, Ship, Plane } from "lucide-react";
+import { Target, Eye, Users, Award } from "lucide-react";
 import Image from "next/image";
 
 const teamMembers = [
@@ -12,9 +12,9 @@ const teamMembers = [
 ];
 
 const capabilities = [
-    { title: "Global Reach", icon: Globe, desc: "Connecting you to over 25 countries with our expansive network." },
-    { title: "Ocean Freight", icon: Ship, desc: "Reliable sea shipping solutions for large volume cargo." },
-    { title: "Air Freight", icon: Plane, desc: "Fast and efficient air transport for time-sensitive shipments." },
+    { title: "Global Reach", icon: "/assets/global-marketing.png", desc: "Connecting you to over 25 countries with our expansive network." },
+    { title: "Ocean Freight", icon: "/assets/ocean-freight.png", desc: "Reliable sea shipping solutions for large volume cargo." },
+    { title: "Air Freight", icon: "/assets/air-cargo.png", desc: "Fast and efficient air transport for time-sensitive shipments." },
 ];
 
 export default function AboutPage() {
@@ -87,8 +87,8 @@ export default function AboutPage() {
                         <div className="grid md:grid-cols-3 gap-8">
                             {capabilities.map((cap, idx) => (
                                 <div key={idx} className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-                                    <div className="w-14 h-14 bg-[#039B81]/10 rounded-xl flex items-center justify-center mb-6">
-                                        <cap.icon className="text-[#039B81]" size={32} />
+                                    <div className="w-14 h-14 bg-[#039B81]/10 rounded-xl flex items-center justify-center mb-6 p-2">
+                                        <Image src={cap.icon} alt={cap.title} width={40} height={40} className="w-full h-full object-contain" />
                                     </div>
                                     <h3 className="text-xl font-bold text-black mb-3">{cap.title}</h3>
                                     <p className="text-gray-600 leading-relaxed">
@@ -104,9 +104,9 @@ export default function AboutPage() {
                 <section className="py-20">
                     <div className="container mx-auto px-4">
                         <div className="text-center mb-16">
-                            <span className="inline-block px-4 py-1 bg-[#039B81]/10 text-[#039B81] rounded-full text-sm font-semibold mb-4">
+                            {/* <span className="inline-block px-4 py-1 bg-[#039B81]/10 text-[#039B81] rounded-full text-sm font-semibold mb-4">
                                 OUR TEAM MEMBERS
-                            </span>
+                            </span> */}
                             <h2 className="text-3xl md:text-4xl font-bold text-black">
                                 Dedicated Professionals Driving Our Success
                             </h2>

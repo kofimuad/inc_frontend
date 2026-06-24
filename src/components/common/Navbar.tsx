@@ -94,7 +94,7 @@ export default function Header() {
                             {/* Logo */}
                             <Link href="/" className="flex items-center gap-3">
                                 <Image
-                                    src="/assets/clinette_logo.jpg"
+                                    src="/assets/clinette.png"
                                     alt="Clinette Shipping & Logistics"
                                     width={160}
                                     height={52}

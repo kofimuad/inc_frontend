@@ -19,7 +19,7 @@ const addresses = [
         ],
         shippingMark: {
             label: "Shipping Mark Format",
-            template: `IC CARGO\nName: [Your Name]\nContact: [Your Phone]\nGoods Description: [Item]\nGoods Count: [Qty]\nSupplier Contact: [Supplier Phone]`,
+            template: `CLINETTE CARGO\nName: [Your Name]\nContact: [Your Phone]\nGoods Description: [Item]\nGoods Count: [Qty]\nSupplier Contact: [Supplier Phone]`,
         },
         warning: null,
     },
@@ -32,11 +32,11 @@ const addresses = [
             { label: "Full Address (Chinese)", value: "浙江省东阳市江北街道歌山北路280号蓝鸟冷库6号荷园仓库-转伟成" },
             { label: "Contact Person", value: "张召 转伟成（CLINETTE LOGISTICS）" },
             { label: "Phone", value: "17757965609" },
-            { label: "Agent", value: "IC CARGO + 深圳伟成" },
+            { label: "Agent", value: "CLINETTE CARGO + 深圳伟成" },
         ],
         shippingMark: {
             label: "Shipping Mark Template (唛头模板)",
-            template: `IC CARGO + 深圳伟成\nCustomer Name / 客户姓名:\nCustomer Phone / 客户电话:\nGoods Description / 货物品名:\nGoods Count / 货物件数:\nSupplier Contact / 供应商联系方式:`,
+            template: `CLINETTE CARGO + 深圳伟成\nCustomer Name / 客户姓名:\nCustomer Phone / 客户电话:\nGoods Description / 货物品名:\nGoods Count / 货物件数:\nSupplier Contact / 供应商联系方式:`,
         },
         warning: [
             "① Pre-booking required — provide packing list before delivery. Unbooked shipments will be REFUSED.",
@@ -105,7 +105,7 @@ export default function AddressPage() {
                                 <p className="text-gray-700">
                                     All packages <strong>must</strong> display a clear shipping mark with your name and contact number.
                                     <br />
-                                    Format: <span className="font-mono bg-white px-2 py-0.5 rounded border">IC CARGO — [Your Name] — [Your Phone]</span>
+                                    Format: <span className="font-mono bg-white px-2 py-0.5 rounded border">CLINETTE CARGO — [Your Name] — [Your Phone]</span>
                                 </p>
                             </div>
                         </div>

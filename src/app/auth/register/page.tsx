@@ -225,7 +225,7 @@ export default function RegisterPage() {
                 <AuthSlider />
                 <div className="absolute top-8 right-8 z-20 opacity-50">
                     <Image
-                        src="/assets/clinette_logo.jpg"
+                        src="/assets/clinette.png"
                         alt="Clinette Logo"
                         width={180}
                         height={60}
