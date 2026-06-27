@@ -32,7 +32,10 @@ const contactInfo = [
         icon: "/assets/location.png",
         title: "Address",
         details: ["Accra Warehouse", "Kumasi Warehouse"],
-        action: "#phone-lines",
+        links: [
+            { label: "📍 Accra Warehouse", url: "https://maps.app.goo.gl/P6CGjVR6CbLWLDyh8" },
+            { label: "📍 Kumasi Warehouse", url: "https://maps.app.goo.gl/BSzdx3VWkvQdQHkL6" },
+        ]
     },
     {
         icon: "/assets/business.png",
@@ -105,21 +108,42 @@ export default function ContactPage() {
                 <section className="py-12 bg-white">
                     <div className="container mx-auto px-4">
                         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            {contactInfo.map((info) => (
-                                <a
-                                    key={info.title}
-                                    href={info.action}
-                                    className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow text-center"
-                                >
-                                    <div className="w-14 h-14 bg-[#039B81]/10 rounded-full flex items-center justify-center mx-auto mb-4 p-2.5">
-                                        <Image src={info.icon} alt={info.title} width={32} height={32} className="w-full h-full object-contain" />
-                                    </div>
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">{info.title}</h3>
-                                    {info.details.map((detail, idx) => (
-                                        <p key={idx} className="text-gray-600 text-sm">{detail}</p>
-                                    ))}
-                                </a>
-                            ))}
+                            {contactInfo.map((info) => {
+                                const CardWrapper = info.links ? 'div' : 'a';
+                                return (
+                                    <CardWrapper
+                                        key={info.title}
+                                        href={info.links ? undefined : info.action}
+                                        target={(!info.links && info.action?.startsWith("http")) ? "_blank" : undefined}
+                                        rel={(!info.links && info.action?.startsWith("http")) ? "noopener noreferrer" : undefined}
+                                        className="relative group bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow text-center cursor-pointer"
+                                    >
+                                        <div className="w-14 h-14 bg-[#039B81]/10 rounded-full flex items-center justify-center mx-auto mb-4 p-2.5">
+                                            <Image src={info.icon} alt={info.title} width={32} height={32} className="w-full h-full object-contain" />
+                                        </div>
+                                        <h3 className="text-lg font-semibold text-gray-800 mb-2">{info.title}</h3>
+                                        {info.details.map((detail, idx) => (
+                                            <p key={idx} className="text-gray-600 text-sm">{detail}</p>
+                                        ))}
+
+                                        {info.links && (
+                                            <div className="absolute left-0 top-full mt-2 w-full bg-white shadow-xl rounded-xl py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 border border-gray-100">
+                                                {info.links.map((link) => (
+                                                    <a
+                                                        key={link.label}
+                                                        href={link.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="block px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-[#039B81] text-left font-medium transition-colors"
+                                                    >
+                                                        {link.label}
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </CardWrapper>
+                                )
+                            })}
                         </div>
                     </div>
                 </section>
@@ -293,26 +317,55 @@ export default function ContactPage() {
                                     <div className="bg-gray-800 px-6 py-4">
                                         <h3 className="text-white font-bold text-lg">Ghana Offices</h3>
                                     </div>
-                                    <div className="p-6 space-y-4">
+                                    <div className="p-6 space-y-6">
                                         <div className="flex items-start gap-3">
                                             <MapPin className="text-[#039B81] mt-1 flex-shrink-0" size={18} />
-                                            <div>
+                                            <div className="w-full">
                                                 <p className="font-semibold text-gray-800">Accra Warehouse</p>
                                                 <p className="text-gray-600 text-sm">Accra, Ghana</p>
                                                 <a href="tel:+233549009957" className="text-[#039B81] text-sm font-mono hover:underline">+233 54 900 9957</a>
+                                                <div className="mt-3 rounded-xl overflow-hidden shadow-sm border border-gray-100">
+                                                    <iframe
+                                                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d4647.923652567!2d-0.29884781474210736!3d5.6433775612893795!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xfdfa17021f6c3cb%3A0x1eee1ddf8a60c9dd!2sI%26C%20warehouse%20China%20to%20Ghana%20shipping!5e0!3m2!1sen!2sgh!4v1782555216380!5m2!1sen!2sgh"
+                                                        width="100%"
+                                                        height="180"
+                                                        style={{ border: 0 }}
+                                                        allowFullScreen
+                                                        loading="lazy"
+                                                        referrerPolicy="strict-origin-when-cross-origin"
+                                                    ></iframe>
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-3">
                                             <MapPin className="text-[#FC6100] mt-1 flex-shrink-0" size={18} />
-                                            <div>
+                                            <div className="w-full">
                                                 <p className="font-semibold text-gray-800">Kumasi Warehouse</p>
                                                 <p className="text-gray-600 text-sm">Kumasi, Ghana</p>
                                                 <a href="tel:+233591976752" className="text-[#FC6100] text-sm font-mono hover:underline">+233 59 197 6752</a>
+                                                <div className="mt-3 rounded-xl overflow-hidden shadow-sm border border-gray-100">
+                                                    <iframe
+                                                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3951.506138452723!2d-1.0280702752948518!3d7.946532284515724!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xfd75b0025bdc3e3%3A0x8304a10d54baabff!2sI%26C%20SHIPPING%20AND%20LOGISTICS%20KUMASI!5e0!3m2!1sen!2sgh!4v1782555343339!5m2!1sen!2sgh"
+                                                        width="100%"
+                                                        height="180"
+                                                        style={{ border: 0 }}
+                                                        allowFullScreen
+                                                        loading="lazy"
+                                                        referrerPolicy="strict-origin-when-cross-origin"
+                                                    ></iframe>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            <MapPin className="text-purple-500 mt-1 flex-shrink-0" size={18} />
+                                            <div className="w-full">
+                                                <p className="font-semibold text-gray-800">Anyaa Market Office</p>
+                                                <p className="text-gray-600 text-sm">Anyaa Market, Accra, Ghana</p>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-3">
                                             <MapPin className="text-blue-500 mt-1 flex-shrink-0" size={18} />
-                                            <div>
+                                            <div className="w-full">
                                                 <p className="font-semibold text-gray-800">Air Cargo Office</p>
                                                 <p className="text-gray-600 text-sm">Accra, Ghana</p>
                                                 <a href="tel:+233544868482" className="text-blue-500 text-sm font-mono hover:underline">+233 54 486 8482</a>

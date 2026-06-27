@@ -1,5 +1,18 @@
 import Link from "next/link";
-import { Phone, Mail, MapPin, Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
+import { Phone, Mail, MapPin, Facebook, Instagram, Linkedin } from "lucide-react";
+
+const TiktokIcon = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className={className}
+    >
+        <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.04.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 2.23-.9 4.4-2.32 5.92-1.53 1.63-3.69 2.64-5.91 2.87-2.31.24-4.71-.16-6.68-1.44-1.89-1.22-3.21-3.23-3.61-5.46-.46-2.61.12-5.44 1.72-7.46 1.34-1.68 3.39-2.72 5.56-3.05.35-.05.7-.09 1.05-.12v4.02c-1.74.2-3.24 1.39-3.9 3.02-.67 1.64-.47 3.66.52 5.12.98 1.45 2.8 2.27 4.56 2.05 1.71-.21 3.12-1.46 3.66-3.09.43-1.32.33-2.78.33-4.17V.02z" />
+    </svg>
+);
 
 const WhatsappIcon = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
     <svg
@@ -42,16 +55,16 @@ export default function Footer() {
                             Your trusted partner for all freight and logistics needs. We deliver excellence across air, sea, and land.
                         </p>
                         <div className="flex gap-4">
-                            <a href="#" className="text-gray-300 hover:text-[#039B81] transition-colors">
+                            <a href="https://www.facebook.com/people/Clinette-Shipping-and-Logistics/100070166457076/" target="blank" rel="noopener noreferrer" className="text-gray-300 hover:text-[#039B81] transition-colors">
                                 <Facebook size={20} />
                             </a>
-                            <a href="#" className="text-gray-300 hover:text-[#039B81] transition-colors">
-                                <Twitter size={20} />
+                            <a href="https://www.tiktok.com/@clinetteshipping?_r=1&_t=ZS-97VOcUXpw3x" target="blank" rel="noopener noreferrer" className="text-gray-300 hover:text-[#039B81] transition-colors">
+                                <TiktokIcon size={20} />
                             </a>
-                            <a href="#" className="text-gray-300 hover:text-[#039B81] transition-colors">
+                            <a href="https://www.instagram.com/clinette_shipping_logistics?igsh=MXVpYmRqbnJweHhwdg%3D%3D&utm_source=qr" target="blank" rel="noopener noreferrer" className="text-gray-300 hover:text-[#039B81] transition-colors">
                                 <Instagram size={20} />
                             </a>
-                            <a href="#" className="text-gray-300 hover:text-[#039B81] transition-colors">
+                            <a href="" target="blank" rel="noopener noreferrer" className="text-gray-300 hover:text-[#039B81] transition-colors">
                                 <Linkedin size={20} />
                             </a>
                         </div>
@@ -101,7 +114,7 @@ export default function Footer() {
                             </li>
                             <li className="flex items-center gap-3">
                                 <Phone size={18} className="text-[#039B81] flex-shrink-0" />
-                                <span className="text-gray-300">+233 54 900 9957</span>
+                                <span className="text-gray-300">+233 55 216 1900</span>
                             </li>
                             <li className="flex items-center gap-3">
                                 <Mail size={18} className="text-[#039B81] flex-shrink-0" />
