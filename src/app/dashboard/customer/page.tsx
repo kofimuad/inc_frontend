@@ -21,12 +21,9 @@ import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/common/ProtectedRoute";
 import { STATUS_COLORS, STATUS_LABELS } from "@/config/constants";
 
-// Generate a deterministic fake container ref from a shipment id.
-// Same approach as the public /container-loadings page uses for the real containers.
-function fakeContainerRef(id: string): string {
-  if (!id) return "ICL-PENDING";
-  return "ICL-" + id.slice(-6).toUpperCase();
-}
+// Goods still at the China warehouse have no container number or ETA —
+// those only exist once the item appears on a loaded packing list.
+const PRE_LOADING_STATUSES = ["in_warehouse", "held"];
 
 // Format a date (string | Date | undefined) as DD MMM YYYY
 function formatDate(date?: string | Date | null): string {
@@ -370,17 +367,27 @@ export default function CustomerDashboard() {
                           const tracking =
                             s.waybillNo || s.trackingNumber || "—";
                           const dateReceived =
+                            s.intakeDate ||
                             s.receivedAt ||
                             s.dates?.receivedAt ||
                             s.createdAt;
-                          const dateLoaded =
-                            s.loadingDate ||
-                            s.shippedAt ||
-                            s.dates?.shippedAt;
-                          const eta =
-                            s.estimatedDelivery ||
-                            s.dates?.estimatedDelivery ||
-                            s.eta;
+                          const statusKey = s.status || "pending";
+                          // Container number and ETA only exist once goods
+                          // are loaded — warehouse goods must show neither.
+                          const isLoaded =
+                            !PRE_LOADING_STATUSES.includes(statusKey);
+                          // receivingDate carries the packing-list loading date
+                          const dateLoaded = isLoaded
+                            ? s.receivingDate ||
+                              s.loadingDate ||
+                              s.shippedAt ||
+                              s.dates?.shippedAt
+                            : null;
+                          const eta = isLoaded
+                            ? s.estimatedDelivery ||
+                              s.dates?.estimatedDelivery ||
+                              s.eta
+                            : null;
                           const cbm = s.cbm;
                           const fee =
                             cbm != null ? cbm * settings.cbmRate : null;
@@ -390,9 +397,9 @@ export default function CustomerDashboard() {
                             s.goodsType ||
                             "—";
                           const qty = s.quantity ?? s.itemsCount ?? 0;
-                          const batchId = s.shippedBatch?._id || s.intakeBatch?._id || id;
-                          const container = fakeContainerRef(batchId);
-                          const statusKey = s.status || "pending";
+                          const container = isLoaded
+                            ? s.containerRef || s.containerNo || null
+                            : null;
                           const statusBadge =
                             STATUS_COLORS[statusKey] || STATUS_COLORS.default;
                           const statusLabel =
@@ -459,7 +466,11 @@ export default function CustomerDashboard() {
                                 {formatDate(dateLoaded)}
                               </td>
                               <td className="px-4 py-4 text-sm font-bold text-[#039B81] font-mono whitespace-nowrap">
-                                {container}
+                                {container || (
+                                  <span className="text-slate-300 font-medium">
+                                    —
+                                  </span>
+                                )}
                               </td>
                               <td className="px-4 py-4 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">
                                 {formatDate(eta)}

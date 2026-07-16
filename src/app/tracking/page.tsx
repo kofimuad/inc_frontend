@@ -40,10 +40,9 @@ function formatDate(date?: string | Date | null): string {
   }
 }
 
-function fakeContainerRef(id: string): string {
-  if (!id) return "ICL-PENDING";
-  return "ICL-" + id.slice(-6).toUpperCase();
-}
+// Goods still at the China warehouse have no container number or ETA —
+// those only exist once the item appears on a loaded packing list.
+const PRE_LOADING_STATUSES = ["in_warehouse", "held"];
 
 // Map status to timeline props
 const getStatusDisplay = (status: string) => {
@@ -337,22 +336,23 @@ function TrackingContent() {
                           ci?.customerPhone ||
                           s.cargo?.customerPhone ||
                           "";
-                        const batchId =
-                          s.batch?.intakeBatch ||
-                          s.batch?.shippedBatch ||
-                          s.shippedBatch?._id ||
-                          s.intakeBatch?._id ||
-                          s._id ||
-                          s.id ||
-                          "";
-                        const containerNo =
-                          s.containerRef || fakeContainerRef(batchId);
-                        // ETA comes from the container the shipment belongs to
-                        const eta =
-                          c?.eta ||
-                          s.dates?.estimatedDelivery ||
-                          s.estimatedDelivery;
                         const statusCode = s.status?.code || s.status;
+                        // Container number and ETA only exist once goods are
+                        // loaded — warehouse goods must show neither.
+                        const isLoaded =
+                          !PRE_LOADING_STATUSES.includes(statusCode);
+                        const containerNo = isLoaded
+                          ? c?.containerNumber ||
+                            s.containerNo ||
+                            s.containerRef ||
+                            null
+                          : null;
+                        // ETA comes from the container the shipment belongs to
+                        const eta = isLoaded
+                          ? c?.eta ||
+                            s.dates?.estimatedDelivery ||
+                            s.estimatedDelivery
+                          : null;
                         const statusLabel =
                           STATUS_LABELS[statusCode] ||
                           getStatusDisplay(statusCode);
@@ -402,7 +402,11 @@ function TrackingContent() {
                               {formatDate(dateLoaded)}
                             </td>
                             <td className="px-4 py-4 text-sm font-bold text-[#039B81] font-mono whitespace-nowrap">
-                              {containerNo}
+                              {containerNo || (
+                                <span className="text-slate-300 font-medium">
+                                  —
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-4 text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">
                               {formatDate(eta)}

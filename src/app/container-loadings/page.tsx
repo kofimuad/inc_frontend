@@ -50,12 +50,6 @@ function formatDate(dateStr?: string) {
     return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-// Derive a public-facing reference ID from the container's DB _id.
-// Real container numbers (e.g. MSBU8308501) are never shown to the public.
-function publicContainerRef(id: string) {
-    return "ICL-" + id.slice(-6).toUpperCase();
-}
-
 // ─── Container card — public view (no expandable items table) ─────────────────
 
 function ContainerCard({ container }: { container: ContainerLoading }) {
@@ -72,7 +66,7 @@ function ContainerCard({ container }: { container: ContainerLoading }) {
                     <div className="flex-grow min-w-0">
                         <div className="flex flex-wrap items-center gap-3 mb-3">
                             <h3 className="text-xl font-black text-slate-800 tracking-tight truncate">
-                                {publicContainerRef(container._id)}
+                                {container.containerNumber}
                             </h3>
                             <StatusBadge status={container.status} />
                         </div>
@@ -142,7 +136,7 @@ function TrackingMatchCard({ item, container }: { item: any; container: Containe
             <div className="border-t border-[#039B81]/10 pt-4">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Container</p>
                 <div className="flex flex-wrap items-center gap-3">
-                    <span className="font-black text-slate-800">{publicContainerRef(container._id)}</span>
+                    <span className="font-black text-slate-800">{container.containerNumber}</span>
                     <StatusBadge status={container.status} />
                     {container.eta && (
                         <span className="text-xs text-slate-500 flex items-center gap-1">
