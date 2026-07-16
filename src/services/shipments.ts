@@ -265,3 +265,13 @@ export const uploadBatchArrived = async (file: File) => {
     const { data: envelope } = await api.post('/api/batches/arrived', formData);
     return envelope.data;
 };
+
+/**
+ * Staff: Retract (delete) a wrong upload at any stage — reverses everything
+ * the batch did (items, statuses, auto-created container).
+ * DELETE /api/batches/:batchId
+ */
+export const retractBatch = async (batchId: string) => {
+    const { data: envelope } = await api.delete(`/api/batches/${batchId}`);
+    return envelope.data as { stage: string; batchCode: string; summary: string };
+};

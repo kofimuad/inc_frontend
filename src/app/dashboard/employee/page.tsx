@@ -7,12 +7,12 @@ import CreateShipmentModal from "@/components/dashboard/CreateShipmentModal";
 import UpdateStatusModal from "@/components/dashboard/UpdateStatusModal";
 import BulkUploadModal from "@/components/dashboard/BulkUploadModal";
 import EditItemModal from "@/components/dashboard/EditItemModal";
-import { Ship, CheckCircle, Clock, Plus, Power, FileUp, RefreshCw, AlertTriangle, Anchor, Pencil } from "lucide-react";
+import { Ship, CheckCircle, Clock, Plus, Power, FileUp, RefreshCw, AlertTriangle, Anchor, Pencil, Trash2 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import Button from "@/components/common/Button";
 import { useDebounce } from "@/hooks/useDebounce";
 import { getBatchShipments, getEmployeeStats } from "@/services/shipments";
-import { listContainerLoadingsStaff, type ContainerLoading } from "@/services/containerLoadings";
+import { listContainerLoadingsStaff, deleteContainerLoading, type ContainerLoading } from "@/services/containerLoadings";
 import ContainerLoadingModal from "@/components/dashboard/ContainerLoadingModal";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/common/ProtectedRoute";
@@ -42,6 +42,23 @@ export default function EmployeeDashboard() {
     const [containers, setContainers]               = useState<ContainerLoading[]>([]);
     const [containerModalOpen, setContainerModalOpen] = useState(false);
     const [editingContainer, setEditingContainer]   = useState<ContainerLoading | undefined>(undefined);
+    const [deletingContainerId, setDeletingContainerId] = useState<string | null>(null);
+
+    const handleDeleteContainer = async (c: ContainerLoading) => {
+        const ok = window.confirm(
+            `Delete container ${c.containerNumber}?\n\nThis removes the container record and clears its number from any shipments that reference it. This cannot be undone.`
+        );
+        if (!ok) return;
+        setDeletingContainerId(c._id);
+        try {
+            await deleteContainerLoading(c._id);
+            setContainers((prev) => prev.filter((x) => x._id !== c._id));
+        } catch (err: any) {
+            alert(err?.response?.data?.message || "Failed to delete container. Please try again.");
+        } finally {
+            setDeletingContainerId(null);
+        }
+    };
 
     const fetchShipments = useCallback(async (isSilent = false) => {
         if (!isSilent) setIsLoading(true);
@@ -387,13 +404,23 @@ export default function EmployeeDashboard() {
                                                     {c.eta        && <p><span className="font-black text-slate-400 uppercase">ETA:</span> {new Date(c.eta).toLocaleDateString("en-GB")}</p>}
                                                     {c.blNumber   && <p><span className="font-black text-slate-400 uppercase">BL:</span> {c.blNumber}</p>}
                                                 </div>
-                                                <button
-                                                    onClick={() => { setEditingContainer(c); setContainerModalOpen(true); }}
-                                                    className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-[#039B81] uppercase tracking-widest transition-colors"
-                                                >
-                                                    <Pencil size={12} />
-                                                    Edit
-                                                </button>
+                                                <div className="flex items-center gap-4">
+                                                    <button
+                                                        onClick={() => { setEditingContainer(c); setContainerModalOpen(true); }}
+                                                        className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-[#039B81] uppercase tracking-widest transition-colors"
+                                                    >
+                                                        <Pencil size={12} />
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteContainer(c)}
+                                                        disabled={deletingContainerId === c._id}
+                                                        className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-widest transition-colors disabled:opacity-50"
+                                                    >
+                                                        <Trash2 size={12} />
+                                                        {deletingContainerId === c._id ? "Deleting..." : "Delete"}
+                                                    </button>
+                                                </div>
                                             </div>
                                         );
                                     })}

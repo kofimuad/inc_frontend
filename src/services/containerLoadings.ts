@@ -74,3 +74,8 @@ export async function updateContainerLoading(id: string, payload: Partial<Contai
     const { data } = await api.patch(`/api/container-loadings/${id}`, payload);
     return data.data as ContainerLoading;
 }
+
+export async function deleteContainerLoading(id: string) {
+    const { data } = await api.delete(`/api/container-loadings/${id}`);
+    return data.data as { containerNumber: string; clearedItems: number };
+}

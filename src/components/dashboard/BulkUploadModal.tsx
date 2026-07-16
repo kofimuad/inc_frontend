@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { X, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Info, ClipboardList } from "lucide-react";
+import { X, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Info, ClipboardList, Undo2 } from "lucide-react";
 import Button from "@/components/common/Button";
-import { uploadBatchShipped, uploadBatchArrived, uploadBatchIntake } from "@/services/shipments";
+import { uploadBatchShipped, uploadBatchArrived, uploadBatchIntake, retractBatch } from "@/services/shipments";
 
 interface BulkUploadModalProps {
     isOpen: boolean;
@@ -26,12 +26,21 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
     const [error, setError] = useState<string | null>(null);
     const [isDuplicate, setIsDuplicate] = useState(false);
 
+    // Retraction (undo a wrong upload)
+    const [batchId, setBatchId] = useState<string | null>(null);
+    const [confirmRetract, setConfirmRetract] = useState(false);
+    const [isRetracting, setIsRetracting] = useState(false);
+    const [retractedMsg, setRetractedMsg] = useState<string | null>(null);
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setFile(e.target.files[0]);
             setError(null);
             setResult(null);
             setIsDuplicate(false);
+            setBatchId(null);
+            setConfirmRetract(false);
+            setRetractedMsg(null);
         }
     };
 
@@ -51,6 +60,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
             }
 
             const batch = data?.batch;
+            setBatchId(batch?._id ?? null);
             setResult({
                 updated: batch?.matchedItems ?? 0,
                 added:   batch?.newItems,
@@ -84,6 +94,31 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
         }
     };
 
+    const handleRetract = async () => {
+        if (!batchId) return;
+        if (!confirmRetract) {
+            setConfirmRetract(true);
+            return;
+        }
+
+        setIsRetracting(true);
+        setError(null);
+        try {
+            const data = await retractBatch(batchId);
+            setRetractedMsg(data?.summary || "Upload retracted — all changes have been undone.");
+            setResult(null);
+            setBatchId(null);
+            setFile(null);
+            setConfirmRetract(false);
+            onSuccess();
+        } catch (err: any) {
+            setError(err?.response?.data?.message || "Failed to retract this upload. Please try again.");
+            setConfirmRetract(false);
+        } finally {
+            setIsRetracting(false);
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -112,7 +147,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                             ].map((s) => (
                                 <button
                                     key={s.id}
-                                    onClick={() => { setStage(s.id as Stage); setFile(null); setResult(null); setError(null); setIsDuplicate(false); }}
+                                    onClick={() => { setStage(s.id as Stage); setFile(null); setResult(null); setError(null); setIsDuplicate(false); setBatchId(null); setConfirmRetract(false); setRetractedMsg(null); }}
                                     className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-1 ${
                                         stage === s.id
                                         ? "border-[#039B81] bg-[#039B81]/5 text-[#039B81]"
@@ -219,6 +254,42 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                                     Some items may have missing data from the sheet. Use the{" "}
                                     <span className="text-[#039B81] font-black">Edit</span> button in the shipments table to fill in any empty fields.
                                 </p>
+                            </div>
+                            {/* Retract (undo) a wrong upload */}
+                            {batchId && (
+                                <div className="mt-4 pt-4 border-t border-emerald-100">
+                                    <button
+                                        onClick={handleRetract}
+                                        disabled={isRetracting}
+                                        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 ${
+                                            confirmRetract
+                                            ? "bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-600/20"
+                                            : "bg-white text-red-500 border border-red-200 hover:bg-red-50"
+                                        }`}
+                                    >
+                                        <Undo2 size={14} />
+                                        {isRetracting
+                                            ? "Retracting..."
+                                            : confirmRetract
+                                            ? "Click again to confirm — undo everything"
+                                            : "Wrong file? Retract this upload"}
+                                    </button>
+                                    {confirmRetract && !isRetracting && (
+                                        <p className="text-[10px] text-red-500 font-bold mt-2">
+                                            This deletes the batch and reverses all item changes it made.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {retractedMsg && (
+                        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex gap-3">
+                            <CheckCircle2 className="text-emerald-500 shrink-0" size={20} />
+                            <div>
+                                <p className="text-xs font-black text-emerald-800 uppercase tracking-widest mb-1">Upload Retracted</p>
+                                <p className="text-xs text-emerald-700 font-bold leading-relaxed">{retractedMsg}</p>
                             </div>
                         </div>
                     )}
