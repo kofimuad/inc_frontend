@@ -247,6 +247,15 @@ export const updateBatchItem = async (itemId: string, updates: Record<string, an
 };
 
 /**
+ * Staff: Delete a single shipment item (e.g. a row uploaded by mistake)
+ * DELETE /api/batches/items/:itemId
+ */
+export const deleteBatchItem = async (itemId: string) => {
+    const { data: envelope } = await api.delete(`/api/batches/items/${itemId}`);
+    return envelope.data as { waybillNo: string };
+};
+
+/**
  * Staff: Get all items belonging to a specific batch
  * GET /api/batches/:batchId/items
  */

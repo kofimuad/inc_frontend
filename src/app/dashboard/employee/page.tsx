@@ -11,7 +11,7 @@ import { Ship, CheckCircle, Clock, Plus, Power, FileUp, RefreshCw, AlertTriangle
 import { useState, useEffect, useCallback } from "react";
 import Button from "@/components/common/Button";
 import { useDebounce } from "@/hooks/useDebounce";
-import { getBatchShipments, getEmployeeStats } from "@/services/shipments";
+import { getBatchShipments, getEmployeeStats, deleteBatchItem } from "@/services/shipments";
 import { listContainerLoadingsStaff, deleteContainerLoading, type ContainerLoading } from "@/services/containerLoadings";
 import ContainerLoadingModal from "@/components/dashboard/ContainerLoadingModal";
 import { useAuth } from "@/context/AuthContext";
@@ -43,6 +43,23 @@ export default function EmployeeDashboard() {
     const [containerModalOpen, setContainerModalOpen] = useState(false);
     const [editingContainer, setEditingContainer]   = useState<ContainerLoading | undefined>(undefined);
     const [deletingContainerId, setDeletingContainerId] = useState<string | null>(null);
+    const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+
+    const handleDeleteItem = async (item: any) => {
+        const ok = window.confirm(
+            `Delete shipment ${item.waybillNo}?\n\nThis permanently removes this one shipment record${item.customerName ? ` (${item.customerName})` : ""}. This cannot be undone.`
+        );
+        if (!ok) return;
+        setDeletingItemId(item._id);
+        try {
+            await deleteBatchItem(item._id);
+            setShipments((prev) => prev.filter((s) => s._id !== item._id));
+        } catch (err: any) {
+            alert(err?.response?.data?.message || "Failed to delete shipment. Please try again.");
+        } finally {
+            setDeletingItemId(null);
+        }
+    };
 
     const handleDeleteContainer = async (c: ContainerLoading) => {
         const ok = window.confirm(
@@ -278,6 +295,14 @@ export default function EmployeeDashboard() {
                     >
                         <Pencil size={11} />
                         Edit
+                    </button>
+                    <button
+                        onClick={() => handleDeleteItem(item)}
+                        disabled={deletingItemId === item._id}
+                        className="flex items-center gap-1 text-slate-400 hover:text-red-500 font-bold text-[10px] uppercase tracking-widest transition-colors disabled:opacity-50"
+                    >
+                        <Trash2 size={11} />
+                        {deletingItemId === item._id ? "..." : "Delete"}
                     </button>
                 </div>
             )
