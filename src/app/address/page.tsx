@@ -66,8 +66,6 @@ const addresses = [
         accentColor: "#039B81",
         fields: [
             { label: "Agent", value: "Clinette Cargo (Office)" },
-            { label: "Name", value: "Aqcosuah" },
-            { label: "Contact", value: "0594788071" },
             { label: "Location", value: "TAMALE-TAM | TAKORADI-TKD | KUMASI-KSI | ACCRA-ACC" },
 
         ],

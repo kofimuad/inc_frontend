@@ -25,8 +25,8 @@ const contactInfo = [
     {
         icon: "/assets/email.png",
         title: "Email",
-        details: ["info@incshipping.com", "support@incshipping.com"],
-        action: "mailto:info@incshipping.com",
+        details: ["clinetteshipping@gmail.com"],
+        action: "mailto:clinetteshipping@gmail.com",
     },
     {
         icon: "/assets/location.png",
@@ -278,6 +278,7 @@ export default function ContactPage() {
                                                 <option value="tracking">Tracking Inquiry</option>
                                                 <option value="support">Customer Support</option>
                                                 <option value="partnership">Business Partnership</option>
+                                                <option value="complaint">Lodge a Complaint</option>
                                                 <option value="other">Other</option>
                                             </select>
                                         </div>

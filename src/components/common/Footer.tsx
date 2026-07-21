@@ -118,7 +118,7 @@ export default function Footer() {
                             </li>
                             <li className="flex items-center gap-3">
                                 <Mail size={18} className="text-[#039B81] flex-shrink-0" />
-                                <span className="text-gray-300">info@incshipping.com</span>
+                                <span className="text-gray-300">clinetteshipping@gmail.com</span>
                             </li>
                             <li className="flex items-center gap-3">
                                 <WhatsappIcon size={18} className="text-[#039B81] flex-shrink-0" />

@@ -310,7 +310,7 @@ function PlatformConfigView({ onRunCleanup, cleanupLoading, cleanupResult, rates
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Support Email</label>
                         <div className="relative">
                             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                            <input disabled className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-400 cursor-not-allowed" defaultValue="support@icshipping.com" title="Read-only — contact support to update" />
+                            <input disabled className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-400 cursor-not-allowed" defaultValue="clinetteshipping@gmail.com" title="Read-only — contact support to update" />
                         </div>
                     </div>
                     <p className="text-[10px] text-slate-400">These fields are read-only. Contact your system administrator to update branding settings.</p>
