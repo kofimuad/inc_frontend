@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { Suspense } from "react";
 import { Phone, Search, Copy, Check, Package, ArrowLeft, AlertCircle, Calculator } from "lucide-react";
 import { getPublicTrackingByPhone } from "@/services/shipments";
-import { getSettings, AppSettings } from "@/services/settings";
+import { getSettings, resolveCbmRate, LOCATION_OPTIONS, DEFAULT_SETTINGS, AppSettings } from "@/services/settings";
 
 // ─── Status badge ──────────────────────────────────────────────────────────────
 const STATUS_STYLES: Record<string, string> = {
@@ -69,17 +69,21 @@ function ShipmentRow({ item, onSelect, selected }: { item: any; onSelect: () => 
 function CostResult({
     cbm,
     settings,
+    cbmRate,
+    locationLabel,
     sublabel,
     copied,
     onCopy,
 }: {
     cbm: number;
     settings: AppSettings;
+    cbmRate: number;
+    locationLabel?: string;
     sublabel?: string;
     copied: boolean;
     onCopy: () => void;
 }) {
-    const calculated = cbm * settings.cbmRate;
+    const calculated = cbm * cbmRate;
     const feeUsd = Math.max(calculated, settings.minFeeUsd);
     const feeGhs = feeUsd * settings.usdToGhsRate;
     const isMinimum = feeUsd > calculated;
@@ -111,8 +115,9 @@ function CostResult({
                 </p>
                 <p className="text-[11px] text-slate-400 font-medium mt-1">
                     {isMinimum
-                        ? `Minimum fee — calculated ${cbm} m³ × USD ${settings.cbmRate} = USD ${calculated.toFixed(2)}`
-                        : `${cbm} m³ × USD ${settings.cbmRate} / CBM`}
+                        ? `Minimum fee — calculated ${cbm} m³ × USD ${cbmRate} = USD ${calculated.toFixed(2)}`
+                        : `${cbm} m³ × USD ${cbmRate} / CBM`}
+                    {locationLabel ? ` · ${locationLabel} rate` : ""}
                 </p>
             </div>
 
@@ -152,8 +157,9 @@ function CalculatorContent() {
 
     // Manual-entry state
     const [manualCbm, setManualCbm] = useState("");
+    const [manualLocation, setManualLocation] = useState<string>("Accra");
 
-    const [settings, setSettings] = useState<AppSettings>({ cbmRate: 230, usdToGhsRate: 15.2, minFeeUsd: 3 });
+    const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
     const [copied, setCopied] = useState(false);
 
     useEffect(() => {
@@ -200,8 +206,19 @@ function CalculatorContent() {
             ? (selected?.cbm ?? null)
             : (parseFloat(manualCbm) > 0 ? parseFloat(manualCbm) : null);
 
+    // Delivery location drives which CBM rate applies. In lookup mode it comes
+    // from the shipment's destination; in manual mode from the dropdown.
+    const activeLocation: string =
+        mode === "lookup"
+            ? (selected?.destinationCity || "Accra")
+            : manualLocation;
+    const effectiveRate = resolveCbmRate(activeLocation, settings);
+    const locationLabel = activeLocation
+        ? activeLocation.charAt(0).toUpperCase() + activeLocation.slice(1).toLowerCase()
+        : "Accra";
+
     const buildQuoteLines = (cbm: number): string[] => {
-        const calculated = cbm * settings.cbmRate;
+        const calculated = cbm * effectiveRate;
         const feeUsd = Math.max(calculated, settings.minFeeUsd);
         const feeGhs = feeUsd * settings.usdToGhsRate;
         const isMinimum = feeUsd > calculated;
@@ -211,8 +228,9 @@ function CalculatorContent() {
             ...(mode === "lookup" && selected
                 ? [`Waybill: ${selected.waybillNo || selected.invoiceNo || "—"}`]
                 : []),
+            `Delivery Location: ${locationLabel}`,
             `Volume (CBM): ${cbm} m³`,
-            `Rate: USD ${settings.cbmRate.toFixed(2)} / CBM`,
+            `Rate: USD ${effectiveRate.toFixed(2)} / CBM`,
             isMinimum
                 ? `Minimum fee applied: USD ${feeUsd.toFixed(2)} (calculated was USD ${calculated.toFixed(2)})`
                 : `Estimated Shipping Fee: USD ${feeUsd.toFixed(2)}`,
@@ -399,13 +417,27 @@ function CalculatorContent() {
                                                     />
                                                 </div>
                                             </div>
+                                            <div>
+                                                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
+                                                    Delivery Location
+                                                </label>
+                                                <select
+                                                    value={manualLocation}
+                                                    onChange={(e) => setManualLocation(e.target.value)}
+                                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:border-[#039B81]/30 transition-all font-medium text-sm"
+                                                >
+                                                    {LOCATION_OPTIONS.map((loc) => (
+                                                        <option key={loc} value={loc}>{loc}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
                                             <p className="text-xs text-slate-400 font-medium">
-                                                Type any CBM value to get an instant estimate. The result will appear on the right.
+                                                Type a CBM value and pick the delivery location to get an instant estimate. The result appears on the right.
                                             </p>
                                             <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
-                                                <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest mb-1">Current Rate</p>
+                                                <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest mb-1">Current Rate — {locationLabel}</p>
                                                 <p className="text-xs text-blue-600 font-medium">
-                                                    USD {settings.cbmRate} / CBM &nbsp;·&nbsp; Min. fee USD {settings.minFeeUsd}
+                                                    USD {effectiveRate} / CBM &nbsp;·&nbsp; Min. fee USD {settings.minFeeUsd}
                                                 </p>
                                             </div>
                                         </div>
@@ -457,9 +489,11 @@ function CalculatorContent() {
                                         <CostResult
                                             cbm={activeCbm}
                                             settings={settings}
+                                            cbmRate={effectiveRate}
+                                            locationLabel={locationLabel}
                                             sublabel={
                                                 mode === "lookup"
-                                                    ? "Measured and confirmed by Clinette at the origin warehouse."
+                                                    ? `Measured and confirmed by Clinette at the origin warehouse. · Delivery to ${locationLabel}`
                                                     : undefined
                                             }
                                             copied={copied}

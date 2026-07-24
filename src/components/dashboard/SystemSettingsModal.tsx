@@ -5,7 +5,7 @@ import { X, Activity, Cpu, Settings, RefreshCw, ShieldCheck, Globe, Mail, Dollar
 import DataTable from "./DataTable";
 import Button from "@/components/common/Button";
 import { getAuditLogs, getGpsDevices, triggerCleanup } from "@/services/admin";
-import { getSettings, updateSettings, AppSettings } from "@/services/settings";
+import { getSettings, updateSettings, DEFAULT_SETTINGS, AppSettings } from "@/services/settings";
 import { getTickerItems, saveTickerItems, generateId, TickerItem, DEFAULT_TICKER_ITEMS } from "@/utils/ticker";
 
 interface SystemSettingsModalProps {
@@ -21,7 +21,7 @@ export default function SystemSettingsModal({ onClose }: SystemSettingsModalProp
     const [loading, setLoading] = useState(false);
     const [cleanupResult, setCleanupResult] = useState<any>(null);
     const [cleanupLoading, setCleanupLoading] = useState(false);
-    const [rates, setRates] = useState<AppSettings>({ cbmRate: 230, usdToGhsRate: 15.2, minFeeUsd: 3 });
+    const [rates, setRates] = useState<AppSettings>(DEFAULT_SETTINGS);
     const [ratesSaving, setRatesSaving] = useState(false);
     const [ratesSaved, setRatesSaved] = useState(false);
     const [ratesError, setRatesError] = useState<string | null>(null);
@@ -346,14 +346,21 @@ function PlatformConfigView({ onRunCleanup, cleanupLoading, cleanupResult, rates
 
             {/* Shipping Rates */}
             <div className="md:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-2 flex items-center gap-2">
                     <DollarSign size={16} className="text-[#039B81]" />
                     Shipping Rates
                 </h3>
-                <div className="grid sm:grid-cols-3 gap-4 mb-4">
+                <p className="text-[10px] text-slate-400 mb-6">
+                    CBM (&quot;CDM&quot;) rate charged per customer depends on their delivery location from the packing list.
+                    Accra is used when no location is set. Kumasi &amp; Takoradi share one rate; Tamale has its own.
+                </p>
+
+                {/* Per-location CBM rates */}
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Rate per CBM by Location (USD)</p>
+                <div className="grid sm:grid-cols-3 gap-4 mb-6">
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                            Rate per CBM (USD)
+                            Accra / Default
                         </label>
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">$</span>
@@ -367,6 +374,41 @@ function PlatformConfigView({ onRunCleanup, cleanupLoading, cleanupResult, rates
                             />
                         </div>
                     </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                            Kumasi &amp; Takoradi
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">$</span>
+                            <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={rates.cbmRateKumasiTakoradi}
+                                onChange={(e) => onRatesChange({ ...rates, cbmRateKumasiTakoradi: parseFloat(e.target.value) || 0 })}
+                                className={`${rateCls} pl-8`}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                            Tamale
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">$</span>
+                            <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={rates.cbmRateTamale}
+                                onChange={(e) => onRatesChange({ ...rates, cbmRateTamale: parseFloat(e.target.value) || 0 })}
+                                className={`${rateCls} pl-8`}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4 mb-4">
                     <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                             USD → GHS Exchange Rate

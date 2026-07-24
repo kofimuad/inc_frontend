@@ -16,6 +16,7 @@ type Stage = 'intake' | 'shipped' | 'arrived';
 export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUploadModalProps) {
     const [stage, setStage] = useState<Stage>('shipped');
     const [file, setFile] = useState<File | null>(null);
+    const [autoHold, setAutoHold] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [result, setResult] = useState<{
         updated: number;
@@ -54,7 +55,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
             if (stage === 'intake') {
                 data = await uploadBatchIntake(file);
             } else if (stage === 'shipped') {
-                data = await uploadBatchShipped(file);
+                data = await uploadBatchShipped(file, autoHold);
             } else if (stage === 'arrived') {
                 data = await uploadBatchArrived(file);
             }
@@ -147,7 +148,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                             ].map((s) => (
                                 <button
                                     key={s.id}
-                                    onClick={() => { setStage(s.id as Stage); setFile(null); setResult(null); setError(null); setIsDuplicate(false); setBatchId(null); setConfirmRetract(false); setRetractedMsg(null); }}
+                                    onClick={() => { setStage(s.id as Stage); setFile(null); setResult(null); setError(null); setIsDuplicate(false); setBatchId(null); setConfirmRetract(false); setRetractedMsg(null); setAutoHold(false); }}
                                     className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-1 ${
                                         stage === s.id
                                         ? "border-[#039B81] bg-[#039B81]/5 text-[#039B81]"
@@ -174,12 +175,9 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                             ) : stage === 'shipped' ? (
                                 <span>
                                     <span className="text-[#039B81] uppercase font-black tracking-widest block mb-1">Packing / Loading List Format:</span>
-                                    Rows 1–8: metadata (BL NUMBER, CTR NUMBER, VOLUME, SEAL NUMBER, PACKING LIST NUMBER, LOADING DATE, ETD, ETA).{" "}
-                                    Row 9: column headers. Data from row 10.
+                                    Two layouts are accepted. <span className="text-slate-900">Headed list:</span> rows 1–8 metadata (BL NUMBER, CTR NUMBER, VOLUME, SEAL NUMBER, PACKING LIST NUMBER, LOADING DATE, ETD, ETA), row 9 headers, data from row 10 — columns JOB NUMBER, CNEE NAME, CUSTOMER NO, LOCATION, GOODS TYPE, QUANTITY, CBM, DESCRIPTION, REMARKS.
                                     <br />
-                                    <span className="block mt-1">Required columns:{" "}
-                                        <span className="text-slate-900">JOB NUMBER, CNEE NAME, CUSTOMER NO (or PHONE NUMBER), LOCATION, GOODS TYPE, QUANTITY, CBM, DESCRIPTION, COLLECT O/F AMOUNT, PAYMENT TERM $, REMARKS</span>.
-                                    </span>
+                                    <span className="block mt-1"><span className="text-slate-900">Container list (no headers):</span> title row like &quot;…-N151-CAIU4815359&quot;, then columns in order — Mark, Tracking, Customer No, Name, Location, Qty, CBM, Goods. Location blank = Accra.</span>
                                 </span>
                             ) : (
                                 <span>
@@ -189,6 +187,25 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                             )}
                         </div>
                     </div>
+
+                    {/* Auto-hold option — only for packing lists */}
+                    {stage === 'shipped' && !result && (
+                        <label className="flex items-start gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer hover:border-slate-200 transition-all">
+                            <input
+                                type="checkbox"
+                                checked={autoHold}
+                                onChange={(e) => setAutoHold(e.target.checked)}
+                                className="mt-0.5 w-4 h-4 accent-[#039B81] shrink-0"
+                            />
+                            <div className="text-xs leading-relaxed">
+                                <span className="font-black text-slate-700">Put remaining warehouse items on hold</span>
+                                <p className="text-slate-500 font-medium mt-0.5">
+                                    Marks warehouse parcels <span className="font-bold">not</span> on this list as &quot;On Hold&quot;. Leave off for a partial
+                                    list — only turn on for a final, complete container manifest.
+                                </p>
+                            </div>
+                        </label>
+                    )}
 
                     {/* File Upload Zone */}
                     {!result ? (

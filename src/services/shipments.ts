@@ -228,9 +228,11 @@ export const uploadBatchIntake = async (file: File) => {
  * Stage 2: China Departure (Shipped)
  * POST /api/batches/shipped
  */
-export const uploadBatchShipped = async (file: File) => {
+export const uploadBatchShipped = async (file: File, autoHold = false) => {
     const formData = new FormData();
     formData.append('file', file);
+    // Opt-in: hold warehouse items not on this packing list (off by default).
+    formData.append('autoHold', String(autoHold));
     const { data: envelope } = await api.post('/api/batches/shipped', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     });

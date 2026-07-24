@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { getMyShipments, getCustomerStats } from "@/services/shipments";
-import { getSettings, AppSettings } from "@/services/settings";
+import { getSettings, resolveCbmRate, DEFAULT_SETTINGS, AppSettings } from "@/services/settings";
 import { linkPhone } from "@/services/auth";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/common/ProtectedRoute";
@@ -44,11 +44,7 @@ export default function CustomerDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [shipments, setShipments] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
-  const [settings, setSettings] = useState<AppSettings>({
-    cbmRate: 230,
-    usdToGhsRate: 15.2,
-    minFeeUsd: 3,
-  });
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<"active" | "history">("active");
@@ -67,7 +63,7 @@ export default function CustomerDashboard() {
       const [shipmentsData, statsData, settingsData] = await Promise.all([
         getMyShipments(),
         getCustomerStats(),
-        getSettings().catch(() => ({ cbmRate: 230, usdToGhsRate: 15.2, minFeeUsd: 3 })),
+        getSettings().catch(() => DEFAULT_SETTINGS),
       ]);
 
       // API returns { total, grouped: { in_warehouse, shipped, customs, out_for_delivery, delivered, held }, pagination }
@@ -390,7 +386,9 @@ export default function CustomerDashboard() {
                             : null;
                           const cbm = s.cbm;
                           const fee =
-                            cbm != null ? cbm * settings.cbmRate : null;
+                            cbm != null
+                              ? cbm * resolveCbmRate(s.destinationCity, settings)
+                              : null;
                           const productName =
                             s.productDescription ||
                             s.description ||
