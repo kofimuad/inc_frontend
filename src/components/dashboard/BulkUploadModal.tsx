@@ -26,6 +26,8 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
     } | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isDuplicate, setIsDuplicate] = useState(false);
+    const [duplicateBatchId, setDuplicateBatchId] = useState<string | null>(null);
+    const [isReplacing, setIsReplacing] = useState(false);
 
     // Retraction (undo a wrong upload)
     const [batchId, setBatchId] = useState<string | null>(null);
@@ -39,6 +41,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
             setError(null);
             setResult(null);
             setIsDuplicate(false);
+            setDuplicateBatchId(null);
             setBatchId(null);
             setConfirmRetract(false);
             setRetractedMsg(null);
@@ -50,6 +53,8 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
 
         setIsLoading(true);
         setError(null);
+        setIsDuplicate(false);
+        setDuplicateBatchId(null);
         try {
             let data;
             if (stage === 'intake') {
@@ -75,6 +80,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
 
             if (statusCode === 409) {
                 setIsDuplicate(true);
+                setDuplicateBatchId(serverData?.data?.batchId ?? null);
                 setError(serverData?.message || "This file has already been uploaded.");
                 return;
             }
@@ -92,6 +98,27 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
             setError(message);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    // Duplicate upload → delete the previous batch, then retry with the same file.
+    const handleReplaceAndRetry = async () => {
+        if (!duplicateBatchId) return;
+        setIsReplacing(true);
+        setError(null);
+        try {
+            await retractBatch(duplicateBatchId);
+            onSuccess();
+            setIsDuplicate(false);
+            setDuplicateBatchId(null);
+            await handleUpload();
+        } catch (err: any) {
+            setError(
+                err?.response?.data?.message ||
+                "Couldn't delete the previous upload. It may have items that already moved to a later stage — retract that stage first."
+            );
+        } finally {
+            setIsReplacing(false);
         }
     };
 
@@ -314,10 +341,26 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                     {isDuplicate && error && (
                         <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex gap-3">
                             <Info className="text-amber-500 shrink-0 mt-0.5" size={20} />
-                            <div>
+                            <div className="flex-1">
                                 <p className="text-xs font-black text-amber-800 uppercase tracking-widest mb-1">Already Uploaded</p>
                                 <p className="text-xs text-amber-700 font-bold leading-relaxed">{error}</p>
-                                <p className="text-[10px] text-amber-600 mt-2">Select a different file or choose a different stage.</p>
+                                {duplicateBatchId ? (
+                                    <>
+                                        <p className="text-[10px] text-amber-600 mt-2">
+                                            Uploaded the wrong file? Delete the previous upload and process this one instead.
+                                        </p>
+                                        <button
+                                            onClick={handleReplaceAndRetry}
+                                            disabled={isReplacing || isLoading}
+                                            className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20"
+                                        >
+                                            <Undo2 size={14} />
+                                            {isReplacing ? "Replacing…" : "Delete previous & upload this"}
+                                        </button>
+                                    </>
+                                ) : (
+                                    <p className="text-[10px] text-amber-600 mt-2">Select a different file or choose a different stage.</p>
+                                )}
                             </div>
                         </div>
                     )}
