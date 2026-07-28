@@ -286,3 +286,25 @@ export const retractBatch = async (batchId: string) => {
     const { data: envelope } = await api.delete(`/api/batches/${batchId}`);
     return envelope.data as { stage: string; batchCode: string; summary: string };
 };
+
+export interface BatchSummary {
+    _id: string;
+    batchCode: string;
+    stage: 'intake' | 'shipped' | 'arrived';
+    totalItems?: number;
+    newItems?: number;
+    matchedItems?: number;
+    heldItems?: number;
+    createdAt?: string;
+    uploadedBy?: { name?: string; email?: string } | null;
+}
+
+/**
+ * Staff: recent upload batches (newest first), for the upload manager.
+ * GET /api/batches?limit=&stage=
+ */
+export const getBatches = async (params: Record<string, any> = {}) => {
+    const { data: envelope } = await api.get('/api/batches', { params });
+    const payload = envelope?.data ?? envelope;
+    return payload as { batches: BatchSummary[]; pagination?: any };
+};

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { X, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Info, ClipboardList, Undo2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { X, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Info, ClipboardList, Undo2, History, RefreshCw } from "lucide-react";
 import Button from "@/components/common/Button";
-import { uploadBatchShipped, uploadBatchArrived, uploadBatchIntake, retractBatch } from "@/services/shipments";
+import { uploadBatchShipped, uploadBatchArrived, uploadBatchIntake, retractBatch, getBatches, BatchSummary } from "@/services/shipments";
 
 interface BulkUploadModalProps {
     isOpen: boolean;
@@ -14,6 +14,7 @@ interface BulkUploadModalProps {
 type Stage = 'intake' | 'shipped' | 'arrived';
 
 export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUploadModalProps) {
+    const [view, setView] = useState<'upload' | 'manage'>('upload');
     const [stage, setStage] = useState<Stage>('shipped');
     const [file, setFile] = useState<File | null>(null);
     const [autoHold, setAutoHold] = useState(false);
@@ -155,14 +156,33 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                 {/* Header */}
                 <div className="flex items-center justify-between p-8 border-b border-slate-50">
                     <div>
-                        <h2 className="text-2xl font-black text-slate-800 tracking-tight">Bulk Shipment Update</h2>
-                        <p className="text-sm text-slate-500 font-medium mt-1">Update multiple shipments using Excel</p>
+                        <h2 className="text-2xl font-black text-slate-800 tracking-tight">
+                            {view === 'manage' ? 'Manage Uploads' : 'Bulk Shipment Update'}
+                        </h2>
+                        <p className="text-sm text-slate-500 font-medium mt-1">
+                            {view === 'manage' ? 'Retract wrong uploads (undo everything they did)' : 'Update multiple shipments using Excel'}
+                        </p>
                     </div>
-                    <button onClick={onClose} className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all">
-                        <X size={24} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setView(view === 'manage' ? 'upload' : 'manage')}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                                view === 'manage'
+                                ? "bg-[#039B81]/10 text-[#039B81]"
+                                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                            }`}
+                        >
+                            {view === 'manage' ? <><Upload size={14} /> Upload</> : <><History size={14} /> Manage Uploads</>}
+                        </button>
+                        <button onClick={onClose} className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all">
+                            <X size={24} />
+                        </button>
+                    </div>
                 </div>
 
+                {view === 'manage' ? (
+                    <RecentUploadsPanel onChanged={onSuccess} />
+                ) : (
                 <div className="p-8 space-y-8">
                     {/* Stage Selection */}
                     <div>
@@ -349,14 +369,26 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                                         <p className="text-[10px] text-amber-600 mt-2">
                                             Uploaded the wrong file? Delete the previous upload and process this one instead.
                                         </p>
-                                        <button
-                                            onClick={handleReplaceAndRetry}
-                                            disabled={isReplacing || isLoading}
-                                            className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20"
-                                        >
-                                            <Undo2 size={14} />
-                                            {isReplacing ? "Replacing…" : "Delete previous & upload this"}
-                                        </button>
+                                        <div className="flex flex-wrap items-center gap-2 mt-3">
+                                            <button
+                                                onClick={handleReplaceAndRetry}
+                                                disabled={isReplacing || isLoading}
+                                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20"
+                                            >
+                                                <Undo2 size={14} />
+                                                {isReplacing ? "Replacing…" : "Delete previous & upload this"}
+                                            </button>
+                                            <button
+                                                onClick={() => setView('manage')}
+                                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-white text-amber-700 border border-amber-300 hover:bg-amber-100"
+                                            >
+                                                <History size={14} /> Manage Uploads
+                                            </button>
+                                        </div>
+                                        <p className="text-[10px] text-amber-600 mt-2 leading-snug">
+                                            If it says a later <span className="uppercase font-black">Arrived</span> upload must be retracted first,
+                                            open <span className="font-black">Manage Uploads</span> and retract that one before this.
+                                        </p>
                                     </>
                                 ) : (
                                     <p className="text-[10px] text-amber-600 mt-2">Select a different file or choose a different stage.</p>
@@ -392,7 +424,124 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                         )}
                     </div>
                 </div>
+                )}
             </div>
+        </div>
+    );
+}
+
+// ── RecentUploadsPanel — list & retract past uploads (in reverse order) ──
+const STAGE_META: Record<string, { label: string; cls: string }> = {
+    intake:  { label: "Intake",  cls: "bg-blue-50 text-blue-700" },
+    shipped: { label: "Packing", cls: "bg-[#039B81]/10 text-[#039B81]" },
+    arrived: { label: "Arrived", cls: "bg-purple-50 text-purple-700" },
+};
+
+function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
+    const [batches, setBatches] = useState<BatchSummary[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [busyId, setBusyId] = useState<string | null>(null);
+    const [confirmId, setConfirmId] = useState<string | null>(null);
+    const [feedback, setFeedback] = useState<{ id: string; ok: boolean; msg: string } | null>(null);
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        setLoadError(null);
+        try {
+            const data = await getBatches({ limit: 25 });
+            setBatches(data?.batches ?? []);
+        } catch {
+            setLoadError("Couldn't load recent uploads. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    const handleRetract = async (id: string) => {
+        if (confirmId !== id) { setConfirmId(id); setFeedback(null); return; }
+        setBusyId(id);
+        setFeedback(null);
+        try {
+            const data = await retractBatch(id);
+            setFeedback({ id, ok: true, msg: data?.summary || "Upload retracted." });
+            setConfirmId(null);
+            onChanged();
+            await load();
+        } catch (err: any) {
+            setFeedback({ id, ok: false, msg: err?.response?.data?.message || "Couldn't retract this upload." });
+            setConfirmId(null);
+        } finally {
+            setBusyId(null);
+        }
+    };
+
+    return (
+        <div className="p-8 space-y-4 max-h-[60vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Recent Uploads</p>
+                <button onClick={load} className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-[#039B81] uppercase tracking-widest transition-colors">
+                    <RefreshCw size={12} /> Refresh
+                </button>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex gap-2">
+                <Info size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-amber-800 font-bold leading-snug">
+                    Retract in reverse order: an <span className="uppercase">Arrived</span> upload must be retracted before the
+                    <span className="uppercase"> Packing</span> list it came from, which must be retracted before its <span className="uppercase">Intake</span>.
+                </p>
+            </div>
+
+            {loading ? (
+                <div className="py-12 flex justify-center"><RefreshCw className="text-[#039B81] animate-spin" size={28} /></div>
+            ) : loadError ? (
+                <p className="text-xs text-red-600 font-bold py-8 text-center">{loadError}</p>
+            ) : batches.length === 0 ? (
+                <p className="text-xs text-slate-400 font-bold py-8 text-center">No uploads yet.</p>
+            ) : (
+                <div className="space-y-2">
+                    {batches.map((b) => {
+                        const meta = STAGE_META[b.stage] ?? { label: b.stage, cls: "bg-slate-100 text-slate-500" };
+                        const fb = feedback?.id === b._id ? feedback : null;
+                        return (
+                            <div key={b._id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${meta.cls}`}>{meta.label}</span>
+                                            <span className="text-xs font-black text-slate-800 truncate">{b.batchCode}</span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 font-bold mt-1">
+                                            {b.totalItems ?? 0} items{b.heldItems ? ` · ${b.heldItems} held` : ""}
+                                            {b.createdAt ? ` · ${new Date(b.createdAt).toLocaleDateString()}` : ""}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => handleRetract(b._id)}
+                                        disabled={busyId === b._id}
+                                        className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 ${
+                                            confirmId === b._id
+                                            ? "bg-red-600 text-white hover:bg-red-700"
+                                            : "bg-white text-red-500 border border-red-200 hover:bg-red-50"
+                                        }`}
+                                    >
+                                        <Undo2 size={13} />
+                                        {busyId === b._id ? "Retracting…" : confirmId === b._id ? "Confirm" : "Retract"}
+                                    </button>
+                                </div>
+                                {fb && (
+                                    <p className={`text-[11px] font-bold mt-2 leading-snug ${fb.ok ? "text-emerald-600" : "text-red-600"}`}>
+                                        {fb.ok ? `✓ ${fb.msg}` : fb.msg}
+                                    </p>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }
