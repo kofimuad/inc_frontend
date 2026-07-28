@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Activity, Cpu, Settings, RefreshCw, ShieldCheck, Globe, Mail, DollarSign, Save, Check, Newspaper, Plus, Trash2, GripVertical, TrendingUp } from "lucide-react";
+import { X, Activity, Cpu, Settings, RefreshCw, ShieldCheck, Globe, Mail, DollarSign, Save, Check, Newspaper, Plus, Trash2, GripVertical, TrendingUp, AlertTriangle } from "lucide-react";
 import DataTable from "./DataTable";
 import Button from "@/components/common/Button";
-import { getAuditLogs, getGpsDevices, triggerCleanup } from "@/services/admin";
+import { getAuditLogs, getGpsDevices, triggerCleanup, purgeOperationalData, PURGE_CONFIRM_PHRASE } from "@/services/admin";
 import { getSettings, updateSettings, DEFAULT_SETTINGS, AppSettings } from "@/services/settings";
 import { getTickerItems, saveTickerItems, generateId, TickerItem, DEFAULT_TICKER_ITEMS } from "@/utils/ticker";
 
@@ -486,6 +486,76 @@ function PlatformConfigView({ onRunCleanup, cleanupLoading, cleanupResult, rates
                     )}
                 </div>
             </div>
+
+            <DangerZone />
+        </div>
+    );
+}
+
+// ── DangerZone — permanently clear all operational data ──
+function DangerZone() {
+    const [phrase, setPhrase] = useState("");
+    const [isPurging, setIsPurging] = useState(false);
+    const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+
+    const canPurge = phrase.trim() === PURGE_CONFIRM_PHRASE && !isPurging;
+
+    const handlePurge = async () => {
+        if (!canPurge) return;
+        setIsPurging(true);
+        setResult(null);
+        try {
+            const data = await purgeOperationalData(phrase.trim());
+            setResult({
+                success: true,
+                message: `Cleared ${data?.shipmentItems ?? 0} shipments, ${data?.batches ?? 0} batches, ${data?.containerLoadings ?? 0} containers.`,
+            });
+            setPhrase("");
+        } catch (err: any) {
+            setResult({ success: false, message: err?.response?.data?.message || "Failed to clear data. Please try again." });
+        } finally {
+            setIsPurging(false);
+        }
+    };
+
+    return (
+        <div className="md:col-span-2 bg-red-50/50 p-6 rounded-2xl border-2 border-red-200 shadow-sm">
+            <h3 className="text-sm font-black text-red-700 uppercase tracking-widest mb-2 flex items-center gap-2">
+                <AlertTriangle size={16} className="text-red-600" />
+                Danger Zone — Clear All Data
+            </h3>
+            <p className="text-xs text-red-600/90 mb-4 leading-relaxed">
+                Permanently deletes <span className="font-black">every shipment, batch, and container</span> from the system.
+                User accounts, rates, and audit logs are kept. <span className="font-black">This cannot be undone.</span> Export
+                anything you need first.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                <div className="flex-1">
+                    <label className="block text-[10px] font-black text-red-500 uppercase tracking-widest mb-2">
+                        Type <span className="font-mono bg-red-100 px-1.5 py-0.5 rounded">{PURGE_CONFIRM_PHRASE}</span> to confirm
+                    </label>
+                    <input
+                        type="text"
+                        value={phrase}
+                        onChange={(e) => setPhrase(e.target.value)}
+                        placeholder={PURGE_CONFIRM_PHRASE}
+                        className="w-full px-4 py-2.5 bg-white border border-red-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400 transition-all"
+                    />
+                </div>
+                <button
+                    onClick={handlePurge}
+                    disabled={!canPurge}
+                    className="sm:mt-6 inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-600/20 shrink-0"
+                >
+                    <Trash2 size={14} />
+                    {isPurging ? "Clearing…" : "Clear Everything"}
+                </button>
+            </div>
+            {result && (
+                <p className={`text-xs font-semibold mt-3 ${result.success ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {result.success ? `✓ ${result.message}` : result.message}
+                </p>
+            )}
         </div>
     );
 }
