@@ -16,7 +16,8 @@ import {
 const STATUS_META: Record<string, { label: string; classes: string; dot: string }> = {
     loading: { label: "Loading",            classes: "bg-yellow-100 text-yellow-700",  dot: "bg-yellow-500" },
     shipped: { label: "Shipped",            classes: "bg-blue-100 text-blue-700",      dot: "bg-blue-500" },
-    arrived: { label: "Arrived",            classes: "bg-emerald-100 text-emerald-700",dot: "bg-emerald-500" },
+    at_port: { label: "At Tema Port",       classes: "bg-orange-100 text-orange-700",  dot: "bg-orange-500" },
+    arrived: { label: "Arrived (Warehouse)",classes: "bg-emerald-100 text-emerald-700",dot: "bg-emerald-500" },
     ready:   { label: "Ready for Pickup",   classes: "bg-[#039B81]/10 text-[#039B81]", dot: "bg-[#039B81]" },
 };
 

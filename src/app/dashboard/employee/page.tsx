@@ -410,6 +410,7 @@ export default function EmployeeDashboard() {
                                         const statusColors: Record<string, string> = {
                                             loading: "bg-yellow-100 text-yellow-700",
                                             shipped: "bg-blue-100 text-blue-700",
+                                            at_port: "bg-orange-100 text-orange-700",
                                             arrived: "bg-emerald-100 text-emerald-700",
                                             ready:   "bg-[#039B81]/10 text-[#039B81]",
                                         };
@@ -421,7 +422,7 @@ export default function EmployeeDashboard() {
                                                         <span className="font-black text-slate-800 text-sm truncate">{c.containerNumber}</span>
                                                     </div>
                                                     <span className={`shrink-0 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${statusColors[c.status] || "bg-slate-100 text-slate-500"}`}>
-                                                        {c.status}
+                                                        {c.status === "at_port" ? "At Tema Port" : c.status.replace(/_/g, " ")}
                                                     </span>
                                                 </div>
                                                 <div className="text-xs text-slate-500 space-y-1 mb-4">

@@ -21,7 +21,7 @@ export interface ContainerLoading {
     etd?: string;
     eta?: string;
     actualArrivalDate?: string;
-    status: "loading" | "shipped" | "arrived" | "ready";
+    status: "loading" | "shipped" | "at_port" | "arrived" | "ready";
     notes?: string;
     staffNotes?: string;
     batchRef?: any;

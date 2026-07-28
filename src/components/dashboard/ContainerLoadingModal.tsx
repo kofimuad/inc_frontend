@@ -18,7 +18,8 @@ interface Props {
 const STATUS_OPTIONS = [
     { value: "loading", label: "Loading" },
     { value: "shipped", label: "Shipped" },
-    { value: "arrived", label: "Arrived" },
+    { value: "at_port", label: "At Tema Port" },
+    { value: "arrived", label: "Arrived (Warehouse)" },
     { value: "ready",   label: "Ready for Pickup" },
 ];
 

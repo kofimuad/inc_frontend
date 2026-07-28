@@ -282,8 +282,10 @@ export const uploadBatchArrived = async (file: File) => {
  * the batch did (items, statuses, auto-created container).
  * DELETE /api/batches/:batchId
  */
-export const retractBatch = async (batchId: string) => {
-    const { data: envelope } = await api.delete(`/api/batches/${batchId}`);
+export const retractBatch = async (batchId: string, force = false) => {
+    const { data: envelope } = await api.delete(`/api/batches/${batchId}`, {
+        params: force ? { force: true } : {},
+    });
     return envelope.data as { stage: string; batchCode: string; summary: string };
 };
 

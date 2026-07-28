@@ -443,7 +443,8 @@ function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
     const [loadError, setLoadError] = useState<string | null>(null);
     const [busyId, setBusyId] = useState<string | null>(null);
     const [confirmId, setConfirmId] = useState<string | null>(null);
-    const [feedback, setFeedback] = useState<{ id: string; ok: boolean; msg: string } | null>(null);
+    const [feedback, setFeedback] = useState<{ id: string; ok: boolean; msg: string; canForce?: boolean } | null>(null);
+    const [forceConfirmId, setForceConfirmId] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -460,22 +461,35 @@ function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
 
     useEffect(() => { load(); }, [load]);
 
-    const handleRetract = async (id: string) => {
-        if (confirmId !== id) { setConfirmId(id); setFeedback(null); return; }
+    const runRetract = async (id: string, force: boolean) => {
         setBusyId(id);
         setFeedback(null);
         try {
-            const data = await retractBatch(id);
+            const data = await retractBatch(id, force);
             setFeedback({ id, ok: true, msg: data?.summary || "Upload retracted." });
             setConfirmId(null);
+            setForceConfirmId(null);
             onChanged();
             await load();
         } catch (err: any) {
-            setFeedback({ id, ok: false, msg: err?.response?.data?.message || "Couldn't retract this upload." });
+            const msg = err?.response?.data?.message || "Couldn't retract this upload.";
+            // A 409 from the progressed-item guard is the only case force can override.
+            const canForce = !force && err?.response?.status === 409 && /cannot retract/i.test(msg);
+            setFeedback({ id, ok: false, msg, canForce });
             setConfirmId(null);
         } finally {
             setBusyId(null);
         }
+    };
+
+    const handleRetract = (id: string) => {
+        if (confirmId !== id) { setConfirmId(id); setFeedback(null); return; }
+        runRetract(id, false);
+    };
+
+    const handleForce = (id: string) => {
+        if (forceConfirmId !== id) { setForceConfirmId(id); return; }
+        runRetract(id, true);
     };
 
     return (
@@ -533,9 +547,37 @@ function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
                                     </button>
                                 </div>
                                 {fb && (
-                                    <p className={`text-[11px] font-bold mt-2 leading-snug ${fb.ok ? "text-emerald-600" : "text-red-600"}`}>
-                                        {fb.ok ? `✓ ${fb.msg}` : fb.msg}
-                                    </p>
+                                    <div className="mt-2">
+                                        <p className={`text-[11px] font-bold leading-snug ${fb.ok ? "text-emerald-600" : "text-red-600"}`}>
+                                            {fb.ok ? `✓ ${fb.msg}` : fb.msg}
+                                        </p>
+                                        {fb.canForce && (
+                                            <div className="mt-2">
+                                                <button
+                                                    onClick={() => handleForce(b._id)}
+                                                    disabled={busyId === b._id}
+                                                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 ${
+                                                        forceConfirmId === b._id
+                                                        ? "bg-red-700 text-white hover:bg-red-800"
+                                                        : "bg-white text-red-600 border border-red-300 hover:bg-red-50"
+                                                    }`}
+                                                >
+                                                    <AlertCircle size={13} />
+                                                    {busyId === b._id
+                                                        ? "Forcing…"
+                                                        : forceConfirmId === b._id
+                                                        ? "Confirm force — undo anyway"
+                                                        : "Force retract (override)"}
+                                                </button>
+                                                {forceConfirmId === b._id && (
+                                                    <p className="text-[10px] text-red-500 font-bold mt-1.5 leading-snug">
+                                                        This reverses the whole batch even though some items already moved forward.
+                                                        Those items are reset too. Use only to undo a wrong upload.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         );
