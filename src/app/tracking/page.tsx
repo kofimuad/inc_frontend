@@ -302,10 +302,13 @@ function TrackingContent() {
                         const ci = r.containerItem;
                         const tracking =
                           s.waybillNo || s.trackingNumber || r.trackingNumber;
+                        // Date Received = when goods were received at the origin
+                        // warehouse (from the sheet's RECEIVING DATE → intakeDate).
+                        // The record's createdAt (upload time) is only a last resort.
                         const dateReceived =
-                          s.dates?.created ||
                           s.dates?.intakeDate ||
                           s.dates?.receivedAt ||
+                          s.dates?.created ||
                           s.createdAt;
                         // Date Loaded = container's loading date or ETD (departure from China)
                         const dateLoaded =

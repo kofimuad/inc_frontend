@@ -14,6 +14,7 @@ interface DataTableProps {
     isLoading?: boolean;
     searchValue?: string;
     onSearchChange?: (value: string) => void;
+    searchPlaceholder?: string;
     pagination?: {
         total: number;
         page: number;
@@ -30,6 +31,7 @@ const DataTable: React.FC<DataTableProps> = ({
     isLoading = false,
     searchValue = "",
     onSearchChange,
+    searchPlaceholder = "Search tracking #, city, or description...",
     pagination,
     onPageChange,
 }) => {
@@ -78,7 +80,7 @@ const DataTable: React.FC<DataTableProps> = ({
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                     <input 
                         type="text" 
-                        placeholder="Search tracking #, city, or description..." 
+                        placeholder={searchPlaceholder}
                         value={searchValue}
                         onChange={(e) => onSearchChange?.(e.target.value)}
                         className="w-full pl-12 pr-4 py-2.5 bg-white border border-slate-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:border-[#039B81]/50 transition-all font-medium"

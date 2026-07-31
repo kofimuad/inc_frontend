@@ -23,6 +23,10 @@ export default function AdminDashboard() {
     const [usersLoading, setUsersLoading] = useState(true);
     const [showCreateUserModal, setShowCreateUserModal] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [search, setSearch] = useState("");
+    const [roleFilter, setRoleFilter] = useState("");
+    const [page, setPage] = useState(1);
+    const [pagination, setPagination] = useState<{ total: number; page: number; limit: number; pages: number } | undefined>(undefined);
 
     const fetchStats = async () => {
         try {
@@ -33,11 +37,21 @@ export default function AdminDashboard() {
         }
     };
 
-    const fetchUsers = async () => {
+    const fetchUsers = async (opts?: { page?: number; search?: string; role?: string }) => {
         setUsersLoading(true);
         try {
-            const data = await getUsers();
+            const params: Record<string, any> = {
+                page:  opts?.page ?? page,
+                limit: 20,
+            };
+            const term = opts?.search ?? search;
+            const role = opts?.role ?? roleFilter;
+            if (term) params.search = term;
+            if (role) params.role = role;
+
+            const data = await getUsers(params);
             setUsers(data?.users || (Array.isArray(data) ? data : []));
+            setPagination(data?.pagination);
         } catch (error) {
             console.error("Failed to fetch users:", error);
         } finally {
@@ -47,8 +61,14 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         fetchStats();
-        fetchUsers();
     }, []);
+
+    // Debounced fetch whenever search / role / page changes.
+    useEffect(() => {
+        const t = setTimeout(() => { fetchUsers({ page, search, role: roleFilter }); }, 300);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search, roleFilter, page]);
 
     const handleLogout = async () => {
         await logout();
@@ -171,23 +191,36 @@ export default function AdminDashboard() {
 
                     {/* User Management Section */}
                     <div>
-                        <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
                             <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
                                 <span className="w-2 h-8 bg-purple-600 rounded-full" />
                                 User Management
                             </h2>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter role</span>
+                                <select
+                                    value={roleFilter}
+                                    onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
+                                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 transition-all"
+                                >
+                                    <option value="">All roles</option>
+                                    <option value="customer">Customer</option>
+                                    <option value="employee">Employee</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
                         </div>
 
-                        {usersLoading ? (
-                            <div className="bg-white rounded-xl border border-slate-200 py-16 flex justify-center text-slate-400 font-medium tracking-widest text-sm uppercase">
-                                Loading users...
-                            </div>
-                        ) : (
-                            <DataTable 
-                                columns={columns}
-                                data={users}
-                            />
-                        )}
+                        <DataTable
+                            columns={columns}
+                            data={users}
+                            isLoading={usersLoading}
+                            searchValue={search}
+                            onSearchChange={(v) => { setSearch(v); setPage(1); }}
+                            searchPlaceholder="Search name or email..."
+                            pagination={pagination}
+                            onPageChange={(p) => setPage(p)}
+                        />
                     </div>
                 </div>
             </main>
