@@ -66,12 +66,26 @@ function isEmpty(val: any): boolean {
     return val === null || val === undefined || String(val).trim() === "";
 }
 
+// Statuses staff can set manually (e.g. when the automatic waybill match missed
+// an item that has physically left the warehouse).
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+    { value: "in_warehouse",     label: "In Warehouse" },
+    { value: "shipped",          label: "Shipped" },
+    { value: "customs",          label: "At Port / Customs" },
+    { value: "out_for_delivery", label: "Out for Delivery" },
+    { value: "delivered",        label: "Delivered" },
+    { value: "held",             label: "On Hold" },
+    { value: "returned",         label: "Returned" },
+    { value: "failed",           label: "Failed" },
+];
+
 export default function EditItemModal({ item, onClose, onSaved }: EditItemModalProps) {
     const [form, setForm] = useState<Record<string, any>>(() => {
         const init: Record<string, any> = {};
         FIELD_GROUPS.forEach(({ fields }) =>
             fields.forEach(({ key }) => { init[key] = item[key] ?? ""; })
         );
+        init.status = item.status ?? "";
         return init;
     });
     const [isSaving, setIsSaving] = useState(false);
@@ -104,6 +118,9 @@ export default function EditItemModal({ item, onClose, onSaved }: EditItemModalP
                     }
                 })
             );
+            if (form.status && form.status !== item.status) {
+                updates.status = form.status;
+            }
             if (Object.keys(updates).length === 0) {
                 setError("No changes to save.");
                 return;
@@ -142,6 +159,28 @@ export default function EditItemModal({ item, onClose, onSaved }: EditItemModalP
 
                 {/* Scrollable form */}
                 <div className="overflow-y-auto p-6 space-y-8 flex-1">
+                    {/* Status — manual override */}
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Status</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Shipment Status</label>
+                                <select
+                                    value={form.status ?? ""}
+                                    onChange={(e) => handleChange("status", e.target.value)}
+                                    className="w-full px-3 py-2.5 rounded-xl text-sm font-medium border bg-slate-50 border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:border-[#039B81]/40 transition-all"
+                                >
+                                    {STATUS_OPTIONS.map((o) => (
+                                        <option key={o.value} value={o.value}>{o.label}</option>
+                                    ))}
+                                </select>
+                                <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                                    Change this to move an item the packing-list upload didn&apos;t catch. Recorded in the timeline.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     {FIELD_GROUPS.map(({ group, fields }) => (
                         <div key={group}>
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">{group}</p>
