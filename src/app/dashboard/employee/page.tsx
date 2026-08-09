@@ -2,16 +2,15 @@
 
 import Navbar from "@/components/common/Navbar";
 import StatsWidget from "@/components/dashboard/StatsWidget";
-import DataTable from "@/components/dashboard/DataTable";
 import CreateShipmentModal from "@/components/dashboard/CreateShipmentModal";
-import UpdateStatusModal from "@/components/dashboard/UpdateStatusModal";
 import BulkUploadModal from "@/components/dashboard/BulkUploadModal";
 import EditItemModal from "@/components/dashboard/EditItemModal";
-import { Ship, CheckCircle, Clock, Plus, Power, FileUp, RefreshCw, AlertTriangle, Anchor, Pencil, Trash2, Search, Package, Warehouse } from "lucide-react";
+import ExpandableUploadCard from "@/components/dashboard/ExpandableUploadCard";
+import { Ship, CheckCircle, Clock, Plus, Power, FileUp, RefreshCw, Anchor, Package, Warehouse, Search, AlertTriangle } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import Button from "@/components/common/Button";
 import { useDebounce } from "@/hooks/useDebounce";
-import { getBatchShipments, getEmployeeStats, deleteBatchItem } from "@/services/shipments";
+import { getBatchShipments, getEmployeeStats, deleteBatchItem, getBatches, fetchBatchItems, type BatchSummary } from "@/services/shipments";
 import { listContainerLoadingsStaff, deleteContainerLoading, type ContainerLoading } from "@/services/containerLoadings";
 import ContainerLoadingModal from "@/components/dashboard/ContainerLoadingModal";
 import { useAuth } from "@/context/AuthContext";
@@ -20,8 +19,6 @@ import { STATUS_COLORS } from "@/config/constants";
 
 export default function EmployeeDashboard() {
     const { logout, user } = useAuth();
-    const [shipments, setShipments] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
     const [stats, setStats] = useState<any>(null);
@@ -29,44 +26,90 @@ export default function EmployeeDashboard() {
     // Three logistics lists matching the three upload stages.
     const [activeList, setActiveList] = useState<'goods_received' | 'container_loadings' | 'arrived'>('goods_received');
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [pagination, setPagination] = useState<any>(null);
-    const [currentPage, setCurrentPage] = useState(1);
     const debouncedSearchQuery = useDebounce(searchQuery, 500);
-    const [containerSearch, setContainerSearch] = useState("");
-    const debouncedContainerSearch = useDebounce(containerSearch, 500);
 
-    // Item-status filter for each item-based list.
-    const LIST_STATUS: Record<string, string> = {
-        goods_received: 'in_warehouse,held',
-        arrived:        'customs',
-    };
-
-    // Status Modal State
-    const [statusModalShipmentId, setStatusModalShipmentId] = useState<string | null>(null);
+    // Card groups for the active tab.
+    const [containers, setContainers] = useState<ContainerLoading[]>([]);
+    const [batchGroups, setBatchGroups] = useState<BatchSummary[]>([]);
+    const [groupsLoading, setGroupsLoading] = useState(true);
+    // Bumped after an item edit/delete so an open card reloads its items.
+    const [itemsRefreshKey, setItemsRefreshKey] = useState(0);
 
     // Edit Item Modal State
     const [editingItem, setEditingItem] = useState<any>(null);
 
     // Container Loadings state
-    const [containers, setContainers]               = useState<ContainerLoading[]>([]);
     const [containerModalOpen, setContainerModalOpen] = useState(false);
     const [editingContainer, setEditingContainer]   = useState<ContainerLoading | undefined>(undefined);
     const [deletingContainerId, setDeletingContainerId] = useState<string | null>(null);
-    const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+
+    const fetchStats = useCallback(async () => {
+        try {
+            const [coreStats, allBatch, onHoldBatch] = await Promise.all([
+                getEmployeeStats(),
+                getBatchShipments({ limit: 1 }),
+                getBatchShipments({ limit: 1, status: 'held' }),
+            ]);
+
+            const totalBatch = allBatch?.pagination?.total || 0;
+
+            setStats({
+                activeShipments: (coreStats?.activeShipments || 0) + totalBatch,
+                pendingUpdates:  coreStats?.pendingUpdates || 0,
+                heldShipments:   (coreStats?.heldShipments || 0) + (onHoldBatch?.pagination?.total || 0),
+                completedToday:  coreStats?.completedToday || 0,
+            });
+        } catch (error) {
+            console.error("Failed to fetch stats:", error);
+        }
+    }, []);
+
+    // Fetch the card groups (batches or containers) for the active tab.
+    const fetchGroups = useCallback(async () => {
+        setGroupsLoading(true);
+        try {
+            const search = debouncedSearchQuery || undefined;
+            if (activeList === 'container_loadings') {
+                const r = await listContainerLoadingsStaff({ limit: 50, search });
+                setContainers(r.containers);
+            } else {
+                const stage = activeList === 'goods_received' ? 'intake' : 'arrived';
+                const r = await getBatches({ stage, limit: 50, search });
+                setBatchGroups(r.batches);
+            }
+        } catch {
+            setContainers([]);
+            setBatchGroups([]);
+        } finally {
+            setGroupsLoading(false);
+        }
+    }, [activeList, debouncedSearchQuery]);
+
+    useEffect(() => { fetchGroups(); }, [fetchGroups]);
+    useEffect(() => { fetchStats(); }, [fetchStats]);
+
+    // Full refresh after uploads / edits.
+    const refresh = useCallback(async () => {
+        setIsRefreshing(true);
+        try {
+            await Promise.all([fetchStats(), fetchGroups()]);
+            setItemsRefreshKey((k) => k + 1);
+        } finally {
+            setIsRefreshing(false);
+        }
+    }, [fetchStats, fetchGroups]);
 
     const handleDeleteItem = async (item: any) => {
         const ok = window.confirm(
             `Delete shipment ${item.waybillNo}?\n\nThis permanently removes this one shipment record${item.customerName ? ` (${item.customerName})` : ""}. This cannot be undone.`
         );
         if (!ok) return;
-        setDeletingItemId(item._id);
         try {
             await deleteBatchItem(item._id);
-            setShipments((prev) => prev.filter((s) => s._id !== item._id));
+            setItemsRefreshKey((k) => k + 1);
+            fetchStats();
         } catch (err: any) {
             alert(err?.response?.data?.message || "Failed to delete shipment. Please try again.");
-        } finally {
-            setDeletingItemId(null);
         }
     };
 
@@ -86,91 +129,6 @@ export default function EmployeeDashboard() {
         }
     };
 
-    const fetchShipments = useCallback(async (isSilent = false) => {
-        // The Container Loadings tab shows containers, not items — skip item fetch.
-        const status = LIST_STATUS[activeList];
-        if (!status) return;
-
-        if (!isSilent) setIsLoading(true);
-        else setIsRefreshing(true);
-
-        try {
-            const params: Record<string, any> = {
-                page: currentPage,
-                limit: 10,
-                status,
-            };
-            if (debouncedSearchQuery) {
-                params.search = debouncedSearchQuery;
-            }
-            const data = await getBatchShipments(params);
-
-            // batch-shipments returns { items, pagination }
-            setShipments(data?.items || (Array.isArray(data) ? data : []));
-            if (data?.pagination) {
-                setPagination(data.pagination);
-            }
-        } catch (error) {
-            console.error("Failed to fetch shipments:", error);
-        } finally {
-            setIsLoading(false);
-            setIsRefreshing(false);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeList, currentPage, debouncedSearchQuery]);
-
-    // Reset to page 1 when the search query or active list changes
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [debouncedSearchQuery, activeList]);
-
-    const fetchStats = useCallback(async () => {
-        try {
-            const [coreStats, allBatch, pendingBatch, onHoldBatch, deliveredBatch] = await Promise.all([
-                getEmployeeStats(),
-                getBatchShipments({ limit: 1 }),
-                getBatchShipments({ limit: 1, status: 'pending' }),
-                getBatchShipments({ limit: 1, status: 'held' }),
-                getBatchShipments({ limit: 1, status: 'delivered' })
-            ]);
-
-            const totalBatch = allBatch?.pagination?.total || 0;
-            const deliveredBatchCount = deliveredBatch?.pagination?.total || 0;
-
-            setStats({
-                activeShipments: (coreStats?.activeShipments || 0) + Math.max(0, totalBatch - deliveredBatchCount),
-                pendingUpdates: (coreStats?.pendingUpdates || 0) + (pendingBatch?.pagination?.total || 0),
-                heldShipments: (coreStats?.heldShipments || 0) + (onHoldBatch?.pagination?.total || 0),
-                completedToday: coreStats?.completedToday || 0,
-            });
-        } catch (error) {
-            console.error("Failed to fetch stats:", error);
-        }
-    }, []);
-
-    const fetchContainers = useCallback(async () => {
-        try {
-            const params: { limit: number; search?: string } = { limit: 50 };
-            if (debouncedContainerSearch) params.search = debouncedContainerSearch;
-            const result = await listContainerLoadingsStaff(params);
-            setContainers(result.containers);
-        } catch {
-            // non-critical — silently ignore
-        }
-    }, [debouncedContainerSearch]);
-
-    const fetchAllData = useCallback(async (isSilent = false) => {
-        await Promise.all([
-            fetchStats(),
-            fetchShipments(isSilent),
-            fetchContainers(),
-        ]);
-    }, [fetchStats, fetchShipments, fetchContainers]);
-
-    useEffect(() => {
-        fetchAllData();
-    }, [fetchAllData]);
-
     const handleLogout = async () => {
         await logout();
     };
@@ -184,151 +142,19 @@ export default function EmployeeDashboard() {
         return STATUS_COLORS[status] || STATUS_COLORS.default;
     };
 
-    const MISSING_KEYS = ["customerName", "customerPhone", "destinationCity", "productDescription", "quantity"];
-    const hasMissingFields = (item: any) =>
-        MISSING_KEYS.some((k) => item[k] === null || item[k] === undefined || String(item[k]).trim() === "");
+    const containerStatusColors: Record<string, string> = {
+        loading: "bg-yellow-100 text-yellow-700",
+        shipped: "bg-blue-100 text-blue-700",
+        at_port: "bg-orange-100 text-orange-700",
+        arrived: "bg-emerald-100 text-emerald-700",
+        ready:   "bg-[#039B81]/10 text-[#039B81]",
+    };
+    const containerStatusLabel = (s: string) => (s === "at_port" ? "At Tema Port" : s.replace(/_/g, " "));
 
-    const columns = [
-        {
-            header: "Tracking Number",
-            accessor: "waybillNo",
-            render: (item: any) => (
-                <span className="flex items-center gap-1.5">
-                    <span className="text-sm font-mono font-bold text-slate-800">{item.waybillNo || "—"}</span>
-                    {hasMissingFields(item) && (
-                        <span title="Has missing fields">
-                            <AlertTriangle size={13} className="text-amber-500 shrink-0" />
-                        </span>
-                    )}
-                </span>
-            )
-        },
-        {
-            header: "Invoice #",
-            accessor: "invoiceNo",
-            render: (item: any) => {
-                if (item._grouped) return <span className="text-slate-200 text-xs select-none">↳</span>;
-                return item.invoiceNo
-                    ? <span className="text-sm font-mono text-slate-700">{item.invoiceNo}</span>
-                    : <span className="text-slate-300 text-xs">—</span>;
-            }
-        },
-        {
-            header: "Customer",
-            accessor: "customerName",
-            render: (item: any) => {
-                if (item._grouped) return (
-                    <span className="text-[11px] font-mono text-slate-300 italic select-none pl-1">
-                        {item.customerPhoneRaw || item.customerPhone || ""}
-                    </span>
-                );
-                return (
-                    <div className="flex flex-col gap-0.5">
-                        <span className="text-sm font-semibold text-slate-800">{item.customerName || <span className="text-slate-300 italic text-xs">No name</span>}</span>
-                        {item.customerPhoneRaw || item.customerPhone ? (
-                            <span className="text-[11px] font-mono text-slate-400">{item.customerPhoneRaw || item.customerPhone}</span>
-                        ) : (
-                            <span className="text-[11px] text-amber-400 font-bold">No phone</span>
-                        )}
-                    </div>
-                );
-            }
-        },
-        { header: "Description", accessor: "productDescription" },
-        { header: "Destination", accessor: "destinationCity" },
-        {
-            header: "Qty",
-            accessor: "itemsCount",
-            render: (item: any) => (
-                <span className="text-sm font-black text-slate-700 bg-slate-100 px-2 py-1 rounded-lg">
-                    {item.itemsCount || item.quantity || 0}
-                </span>
-            )
-        },
-        {
-            header: "CBM",
-            accessor: "cbm",
-            render: (item: any) => (
-                item.cbm != null
-                    ? <span className="text-sm font-black text-slate-700 tabular-nums">{item.cbm} <span className="text-[10px] font-medium text-slate-400">m³</span></span>
-                    : <span className="text-slate-300 text-xs">—</span>
-            )
-        },
-        {
-            header: "ETA",
-            accessor: "estimatedDelivery",
-            render: (item: any) => {
-                const matchedContainer = item.containerRef
-                    ? containers.find((c) => c.containerNumber === item.containerRef)
-                    : null;
-                const date = item.estimatedDelivery || matchedContainer?.eta || item.receivingDate;
-                return date
-                    ? <span className="text-[10px] font-bold text-slate-500 tabular-nums">{new Date(date).toLocaleDateString('en-GB')}</span>
-                    : <span className="text-slate-300 text-xs">—</span>;
-            }
-        },
-        {
-            header: "Date",
-            accessor: "createdAt",
-            render: (item: any) => (
-                <span className="text-[10px] font-bold text-slate-400 uppercase">
-                    {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB') : 'N/A'}
-                </span>
-            )
-        },
-        {
-            header: "Status",
-            accessor: "status",
-            render: (item: any) => (
-                <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${getStatusColor(item.status)}`}>
-                    {formatStatus(item.status)}
-                </span>
-            )
-        },
-        {
-            header: "Container", accessor: "containerRef", render: (item: any) => (
-                <span className="text-sm font-bold text-[#039B81]">
-                    {item.containerRef || '—'}
-                </span>
-            )
-        },
-        {
-            header: "Actions",
-            accessor: "_id",
-            render: (item: any) => (
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setStatusModalShipmentId(item._id)}
-                        className="text-[#039B81] font-bold text-[10px] uppercase tracking-widest hover:underline"
-                    >
-                        Update
-                    </button>
-                    <button
-                        onClick={() => setEditingItem(item)}
-                        className="flex items-center gap-1 text-slate-400 hover:text-slate-700 font-bold text-[10px] uppercase tracking-widest transition-colors"
-                    >
-                        <Pencil size={11} />
-                        Edit
-                    </button>
-                    <button
-                        onClick={() => handleDeleteItem(item)}
-                        disabled={deletingItemId === item._id}
-                        className="flex items-center gap-1 text-slate-400 hover:text-red-500 font-bold text-[10px] uppercase tracking-widest transition-colors disabled:opacity-50"
-                    >
-                        <Trash2 size={11} />
-                        {deletingItemId === item._id ? "..." : "Delete"}
-                    </button>
-                </div>
-            )
-        }
-    ];
-
-    // Annotate each row so renders know when a customer's packages span multiple rows.
-    // Consecutive rows sharing the same customerPhone are treated as one group.
-    const filteredShipments = shipments.map((s: any, idx: number) => ({
-      ...s,
-      _grouped: idx > 0 && shipments[idx - 1].customerPhone === s.customerPhone,
-    }));
+    const searchPlaceholder =
+        activeList === 'container_loadings' ? "Search container #, BL, or vessel..."
+        : activeList === 'goods_received'   ? "Search goods-received uploads (batch code)..."
+        :                                     "Search arrived uploads (batch code)...";
 
     return (
         <ProtectedRoute allowedRoles={['employee', 'admin']}>
@@ -358,7 +184,7 @@ export default function EmployeeDashboard() {
                                     New Shipment
                                 </Button>
                                 <button
-                                    onClick={() => fetchAllData(true)}
+                                    onClick={() => refresh()}
                                     className={`p-3 bg-white border-2 border-slate-200 text-slate-400 hover:text-[#039B81] hover:border-[#039B81]/30 rounded-xl transition-all shrink-0 ${isRefreshing ? 'animate-spin text-[#039B81]' : ''}`}
                                     title="Refresh Data"
                                 >
@@ -435,128 +261,112 @@ export default function EmployeeDashboard() {
                                 )}
                             </div>
 
-                        {/* ── Container Loadings tab ── */}
-                        {activeList === 'container_loadings' ? (
-                          <div>
+                            {/* Search for the active list */}
                             <div className="relative max-w-md mb-6">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                 <input
                                     type="text"
-                                    value={containerSearch}
-                                    onChange={(e) => setContainerSearch(e.target.value)}
-                                    placeholder="Search container #, BL, or vessel..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder={searchPlaceholder}
                                     className="w-full pl-12 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:border-[#039B81]/50 transition-all"
                                 />
                             </div>
-                            {containers.length === 0 ? (
-                                <div className="bg-white rounded-2xl border border-slate-100 py-10 text-center text-slate-400 text-xs font-black uppercase tracking-widest">
-                                    {containerSearch ? "No containers match your search." : "No containers yet. Containers are auto-created from shipped batch uploads."}
+
+                            {groupsLoading ? (
+                                <div className="bg-white rounded-2xl border border-slate-100 py-16 flex justify-center text-slate-400 font-medium tracking-widest text-sm uppercase">
+                                    Loading…
                                 </div>
+                            ) : activeList === 'container_loadings' ? (
+                                containers.length === 0 ? (
+                                    <div className="bg-white rounded-2xl border border-slate-100 py-10 text-center text-slate-400 text-xs font-black uppercase tracking-widest">
+                                        {searchQuery ? "No containers match your search." : "No containers yet. Containers are auto-created from shipped batch uploads."}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {containers.map((c) => (
+                                            <ExpandableUploadCard
+                                                key={c._id}
+                                                title={c.containerNumber}
+                                                icon={<Anchor size={16} className="text-[#039B81] shrink-0" />}
+                                                badge={{ label: containerStatusLabel(c.status), className: containerStatusColors[c.status] || "bg-slate-100 text-slate-500" }}
+                                                meta={[
+                                                    ...(c.eta        ? [{ label: "ETA",    value: new Date(c.eta).toLocaleDateString("en-GB") }] : []),
+                                                    ...(c.vesselName ? [{ label: "Vessel", value: c.vesselName }] : []),
+                                                    ...(c.blNumber   ? [{ label: "BL",     value: c.blNumber }] : []),
+                                                ]}
+                                                onEdit={() => { setEditingContainer(c); setContainerModalOpen(true); }}
+                                                onDelete={() => handleDeleteContainer(c)}
+                                                deleting={deletingContainerId === c._id}
+                                                loadItems={async () => {
+                                                    const bid = c.batchRef?._id || c.batchRef;
+                                                    if (!bid) return [];
+                                                    return (await fetchBatchItems(bid)).items;
+                                                }}
+                                                onEditItem={setEditingItem}
+                                                onDeleteItem={handleDeleteItem}
+                                                statusColor={getStatusColor}
+                                                formatStatus={formatStatus}
+                                                reloadKey={itemsRefreshKey}
+                                            />
+                                        ))}
+                                    </div>
+                                )
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {containers.map((c) => {
-                                        const statusColors: Record<string, string> = {
-                                            loading: "bg-yellow-100 text-yellow-700",
-                                            shipped: "bg-blue-100 text-blue-700",
-                                            at_port: "bg-orange-100 text-orange-700",
-                                            arrived: "bg-emerald-100 text-emerald-700",
-                                            ready:   "bg-[#039B81]/10 text-[#039B81]",
-                                        };
-                                        return (
-                                            <div key={c._id} className="bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-md transition-all group">
-                                                <div className="flex items-start justify-between gap-2 mb-3">
-                                                    <div className="flex items-center gap-2 min-w-0">
-                                                        <Anchor size={16} className="text-[#039B81] shrink-0" />
-                                                        <span className="font-black text-slate-800 text-sm truncate">{c.containerNumber}</span>
-                                                    </div>
-                                                    <span className={`shrink-0 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${statusColors[c.status] || "bg-slate-100 text-slate-500"}`}>
-                                                        {c.status === "at_port" ? "At Tema Port" : c.status.replace(/_/g, " ")}
-                                                    </span>
-                                                </div>
-                                                <div className="text-xs text-slate-500 space-y-1 mb-4">
-                                                    {c.vesselName && <p><span className="font-black text-slate-400 uppercase">Vessel:</span> {c.vesselName}</p>}
-                                                    {c.eta        && <p><span className="font-black text-slate-400 uppercase">ETA:</span> {new Date(c.eta).toLocaleDateString("en-GB")}</p>}
-                                                    {c.blNumber   && <p><span className="font-black text-slate-400 uppercase">BL:</span> {c.blNumber}</p>}
-                                                </div>
-                                                <div className="flex items-center gap-4">
-                                                    <button
-                                                        onClick={() => { setEditingContainer(c); setContainerModalOpen(true); }}
-                                                        className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-[#039B81] uppercase tracking-widest transition-colors"
-                                                    >
-                                                        <Pencil size={12} />
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteContainer(c)}
-                                                        disabled={deletingContainerId === c._id}
-                                                        className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-widest transition-colors disabled:opacity-50"
-                                                    >
-                                                        <Trash2 size={12} />
-                                                        {deletingContainerId === c._id ? "Deleting..." : "Delete"}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                batchGroups.length === 0 ? (
+                                    <div className="bg-white rounded-2xl border border-slate-100 py-10 text-center text-slate-400 text-xs font-black uppercase tracking-widest">
+                                        {searchQuery
+                                            ? "No uploads match your search."
+                                            : activeList === 'goods_received' ? "No goods-received uploads yet." : "No arrived-goods uploads yet."}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {batchGroups.map((b) => (
+                                            <ExpandableUploadCard
+                                                key={b._id}
+                                                title={b.batchCode}
+                                                icon={activeList === 'goods_received'
+                                                    ? <Warehouse size={16} className="text-[#039B81] shrink-0" />
+                                                    : <Package size={16} className="text-purple-500 shrink-0" />}
+                                                badge={{ label: `${b.totalItems ?? 0} items`, className: "bg-slate-100 text-slate-600" }}
+                                                meta={[
+                                                    ...(b.createdAt ? [{ label: "Uploaded", value: new Date(b.createdAt).toLocaleDateString("en-GB") }] : []),
+                                                    ...((b.heldItems ?? 0) > 0 ? [{ label: "Held", value: String(b.heldItems) }] : []),
+                                                ]}
+                                                loadItems={async () => (await fetchBatchItems(b._id)).items}
+                                                onEditItem={setEditingItem}
+                                                onDeleteItem={handleDeleteItem}
+                                                statusColor={getStatusColor}
+                                                formatStatus={formatStatus}
+                                                reloadKey={itemsRefreshKey}
+                                            />
+                                        ))}
+                                    </div>
+                                )
                             )}
-                          </div>
-                        ) : (
-                          /* ── Goods Received / Arrived Goods tab (items) ── */
-                          isLoading ? (
-                            <div className="bg-white rounded-xl border border-slate-200 py-16 flex justify-center text-slate-400 font-medium tracking-widest text-sm uppercase">
-                                Loading {activeList === 'goods_received' ? 'goods received' : 'arrived goods'}...
-                            </div>
-                          ) : filteredShipments.length > 0 ? (
-                            <DataTable
-                                columns={columns}
-                                data={filteredShipments}
-                                searchValue={searchQuery}
-                                onSearchChange={setSearchQuery}
-                                searchPlaceholder={activeList === 'goods_received' ? 'Search goods received — tracking, customer, city...' : 'Search arrived goods — tracking, customer, city...'}
-                                pagination={pagination}
-                                onPageChange={(page) => setCurrentPage(page)}
-                            />
-                          ) : (
-                            <div className="bg-white rounded-xl border border-slate-200 py-16 flex flex-col items-center gap-4 text-slate-400 font-medium tracking-widest text-sm uppercase">
-                                <span>{activeList === 'goods_received' ? 'No goods in the warehouse.' : 'No arrived goods yet.'}</span>
-                                {searchQuery && (
-                                    <button onClick={() => setSearchQuery("")} className="text-[#039B81] text-xs underline">Clear Search</button>
-                                )}
-                            </div>
-                          )
-                        )}
                         </div>
                     </div>
                 </main>
                 <CreateShipmentModal
                     isOpen={isCreateModalOpen}
                     onClose={() => setIsCreateModalOpen(false)}
-                    onSuccess={fetchAllData}
-                />
-
-                <UpdateStatusModal
-                    isOpen={!!statusModalShipmentId}
-                    onClose={() => setStatusModalShipmentId(null)}
-                    onSuccess={fetchAllData}
-                    shipmentId={statusModalShipmentId || ""}
+                    onSuccess={refresh}
                 />
 
                 <BulkUploadModal
                     isOpen={isBulkModalOpen}
                     onClose={() => setIsBulkModalOpen(false)}
-                    onSuccess={fetchAllData}
+                    onSuccess={refresh}
                 />
 
                 {editingItem && (
                     <EditItemModal
                         item={editingItem}
                         onClose={() => setEditingItem(null)}
-                        onSaved={(updated) => {
-                            setShipments((prev) =>
-                                prev.map((s) => (s._id === updated._id ? updated : s))
-                            );
+                        onSaved={() => {
                             setEditingItem(null);
+                            setItemsRefreshKey((k) => k + 1);
+                            fetchStats();
                         }}
                     />
                 )}
