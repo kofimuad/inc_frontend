@@ -60,7 +60,7 @@ export async function getContainerLoading(id: string) {
     return data.data as { container: ContainerLoading; items: ContainerItem[] };
 }
 
-export async function listContainerLoadingsStaff(params?: { page?: number; limit?: number; status?: string }) {
+export async function listContainerLoadingsStaff(params?: { page?: number; limit?: number; status?: string; search?: string }) {
     const { data } = await api.get("/api/container-loadings/staff/list", { params });
     return data.data as { containers: ContainerLoading[]; pagination: any };
 }

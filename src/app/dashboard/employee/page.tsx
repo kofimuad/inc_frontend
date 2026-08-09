@@ -7,7 +7,7 @@ import CreateShipmentModal from "@/components/dashboard/CreateShipmentModal";
 import UpdateStatusModal from "@/components/dashboard/UpdateStatusModal";
 import BulkUploadModal from "@/components/dashboard/BulkUploadModal";
 import EditItemModal from "@/components/dashboard/EditItemModal";
-import { Ship, CheckCircle, Clock, Plus, Power, FileUp, RefreshCw, AlertTriangle, Anchor, Pencil, Trash2 } from "lucide-react";
+import { Ship, CheckCircle, Clock, Plus, Power, FileUp, RefreshCw, AlertTriangle, Anchor, Pencil, Trash2, Search, Package, Warehouse } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import Button from "@/components/common/Button";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -26,11 +26,20 @@ export default function EmployeeDashboard() {
     const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
     const [stats, setStats] = useState<any>(null);
     const [searchQuery, setSearchQuery] = useState("");
-    const [activeStage, setActiveStage] = useState<'all' | 'pending' | 'in_transit' | 'delivered'>('all');
+    // Three logistics lists matching the three upload stages.
+    const [activeList, setActiveList] = useState<'goods_received' | 'container_loadings' | 'arrived'>('goods_received');
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [pagination, setPagination] = useState<any>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const debouncedSearchQuery = useDebounce(searchQuery, 500);
+    const [containerSearch, setContainerSearch] = useState("");
+    const debouncedContainerSearch = useDebounce(containerSearch, 500);
+
+    // Item-status filter for each item-based list.
+    const LIST_STATUS: Record<string, string> = {
+        goods_received: 'in_warehouse,held',
+        arrived:        'customs',
+    };
 
     // Status Modal State
     const [statusModalShipmentId, setStatusModalShipmentId] = useState<string | null>(null);
@@ -78,17 +87,19 @@ export default function EmployeeDashboard() {
     };
 
     const fetchShipments = useCallback(async (isSilent = false) => {
+        // The Container Loadings tab shows containers, not items — skip item fetch.
+        const status = LIST_STATUS[activeList];
+        if (!status) return;
+
         if (!isSilent) setIsLoading(true);
         else setIsRefreshing(true);
 
         try {
             const params: Record<string, any> = {
                 page: currentPage,
-                limit: 10
+                limit: 10,
+                status,
             };
-            if (activeStage !== 'all') {
-                params.status = activeStage;
-            }
             if (debouncedSearchQuery) {
                 params.search = debouncedSearchQuery;
             }
@@ -105,12 +116,13 @@ export default function EmployeeDashboard() {
             setIsLoading(false);
             setIsRefreshing(false);
         }
-    }, [activeStage, currentPage, debouncedSearchQuery]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeList, currentPage, debouncedSearchQuery]);
 
-    // Reset to page 1 when search query or stage changes
+    // Reset to page 1 when the search query or active list changes
     useEffect(() => {
         setCurrentPage(1);
-    }, [debouncedSearchQuery, activeStage]);
+    }, [debouncedSearchQuery, activeList]);
 
     const fetchStats = useCallback(async () => {
         try {
@@ -138,12 +150,14 @@ export default function EmployeeDashboard() {
 
     const fetchContainers = useCallback(async () => {
         try {
-            const result = await listContainerLoadingsStaff({ limit: 50 });
+            const params: { limit: number; search?: string } = { limit: 50 };
+            if (debouncedContainerSearch) params.search = debouncedContainerSearch;
+            const result = await listContainerLoadingsStaff(params);
             setContainers(result.containers);
         } catch {
             // non-critical — silently ignore
         }
-    }, []);
+    }, [debouncedContainerSearch]);
 
     const fetchAllData = useCallback(async (isSilent = false) => {
         await Promise.all([
@@ -384,25 +398,59 @@ export default function EmployeeDashboard() {
                             />
                         </div>
 
-                        {/* Container Loadings Section */}
-                        <div className="mb-12">
-                            <div className="flex items-center justify-between mb-6">
-                                <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
-                                    <span className="w-2 h-8 bg-blue-500 rounded-full" />
-                                    Container Loadings
-                                </h2>
-                                <Button
-                                    onClick={() => { setEditingContainer(undefined); setContainerModalOpen(true); }}
-                                    className="py-2.5 px-5 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#039B81]/20"
-                                >
-                                    <Plus size={16} className="mr-2" />
-                                    New Container
-                                </Button>
+                        {/* Logistics — three lists matching the upload stages */}
+                        <div>
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                                <div className="flex flex-wrap bg-slate-200/50 p-1.5 rounded-2xl border border-slate-200/60 self-start">
+                                    {[
+                                        { id: 'goods_received',     label: 'Goods Received',     icon: Warehouse },
+                                        { id: 'container_loadings', label: 'Container Loadings', icon: Anchor },
+                                        { id: 'arrived',            label: 'Arrived Goods',      icon: Package },
+                                    ].map((s) => {
+                                        const Icon = s.icon;
+                                        return (
+                                            <button
+                                                key={s.id}
+                                                onClick={() => setActiveList(s.id as any)}
+                                                className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all ${
+                                                    activeList === s.id
+                                                    ? "bg-white text-[#039B81] shadow-lg shadow-[#039B81]/10"
+                                                    : "text-slate-500 hover:text-slate-800"
+                                                }`}
+                                            >
+                                                <Icon size={13} />
+                                                {s.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                {activeList === 'container_loadings' && (
+                                    <Button
+                                        onClick={() => { setEditingContainer(undefined); setContainerModalOpen(true); }}
+                                        className="py-2.5 px-5 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#039B81]/20 self-start"
+                                    >
+                                        <Plus size={16} className="mr-2" />
+                                        New Container
+                                    </Button>
+                                )}
                             </div>
 
+                        {/* ── Container Loadings tab ── */}
+                        {activeList === 'container_loadings' ? (
+                          <div>
+                            <div className="relative max-w-md mb-6">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                <input
+                                    type="text"
+                                    value={containerSearch}
+                                    onChange={(e) => setContainerSearch(e.target.value)}
+                                    placeholder="Search container #, BL, or vessel..."
+                                    className="w-full pl-12 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:border-[#039B81]/50 transition-all"
+                                />
+                            </div>
                             {containers.length === 0 ? (
                                 <div className="bg-white rounded-2xl border border-slate-100 py-10 text-center text-slate-400 text-xs font-black uppercase tracking-widest">
-                                    No containers yet. Containers are auto-created from shipped batch uploads.
+                                    {containerSearch ? "No containers match your search." : "No containers yet. Containers are auto-created from shipped batch uploads."}
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -452,63 +500,32 @@ export default function EmployeeDashboard() {
                                     })}
                                 </div>
                             )}
-                        </div>
-
-                        {/* Shipments Table Section */}
-                        <div>
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-                                <h2 className="text-xl font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
-                                    <span className="w-2 h-8 bg-[#039B81] rounded-full" />
-                                    {activeStage === 'all' ? 'All Shipments' : `${activeStage.replace('_', ' ')} Shipments`}
-                                </h2>
-
-                                <div className="flex bg-slate-200/50 p-1.5 rounded-2xl border border-slate-200/60 backdrop-blur-sm self-start md:self-auto">
-                                    {[
-                                        { id: 'all', label: 'All' },
-                                        { id: 'pending', label: 'Intake' },
-                                        { id: 'held', label: 'Held' },
-                                        { id: 'in_transit', label: 'Shipped' },
-                                        { id: 'delivered', label: 'Arrived' }
-                                    ].map((s) => (
-                                        <button
-                                            key={s.id}
-                                            onClick={() => {
-                                                setActiveStage(s.id as any);
-                                                setCurrentPage(1);
-                                            }}
-                                            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
-                                                activeStage === s.id 
-                                                ? "bg-white text-[#039B81] shadow-lg shadow-[#039B81]/10" 
-                                                : "text-slate-500 hover:text-slate-800"
-                                            }`}
-                                        >
-                                            {s.label}
-                                        </button>
-                                    ))}
-                                </div>
+                          </div>
+                        ) : (
+                          /* ── Goods Received / Arrived Goods tab (items) ── */
+                          isLoading ? (
+                            <div className="bg-white rounded-xl border border-slate-200 py-16 flex justify-center text-slate-400 font-medium tracking-widest text-sm uppercase">
+                                Loading {activeList === 'goods_received' ? 'goods received' : 'arrived goods'}...
                             </div>
-
-                            {isLoading ? (
-                                <div className="bg-white rounded-xl border border-slate-200 py-16 flex justify-center text-slate-400 font-medium tracking-widest text-sm uppercase">
-                                    Loading logistics database...
-                                </div>
-                            ) : filteredShipments.length > 0 ? (
-                                <DataTable
-                                    columns={columns}
-                                    data={filteredShipments}
-                                    searchValue={searchQuery}
-                                    onSearchChange={setSearchQuery}
-                                    pagination={pagination}
-                                    onPageChange={(page) => setCurrentPage(page)}
-                                />
-                            ) : (
-                                <div className="bg-white rounded-xl border border-slate-200 py-16 flex flex-col items-center gap-4 text-slate-400 font-medium tracking-widest text-sm uppercase">
-                                    <span>No shipments found.</span>
-                                    {searchQuery && (
-                                        <button onClick={() => setSearchQuery("")} className="text-[#039B81] text-xs underline">Clear Search</button>
-                                    )}
-                                </div>
-                            )}
+                          ) : filteredShipments.length > 0 ? (
+                            <DataTable
+                                columns={columns}
+                                data={filteredShipments}
+                                searchValue={searchQuery}
+                                onSearchChange={setSearchQuery}
+                                searchPlaceholder={activeList === 'goods_received' ? 'Search goods received — tracking, customer, city...' : 'Search arrived goods — tracking, customer, city...'}
+                                pagination={pagination}
+                                onPageChange={(page) => setCurrentPage(page)}
+                            />
+                          ) : (
+                            <div className="bg-white rounded-xl border border-slate-200 py-16 flex flex-col items-center gap-4 text-slate-400 font-medium tracking-widest text-sm uppercase">
+                                <span>{activeList === 'goods_received' ? 'No goods in the warehouse.' : 'No arrived goods yet.'}</span>
+                                {searchQuery && (
+                                    <button onClick={() => setSearchQuery("")} className="text-[#039B81] text-xs underline">Clear Search</button>
+                                )}
+                            </div>
+                          )
+                        )}
                         </div>
                     </div>
                 </main>
