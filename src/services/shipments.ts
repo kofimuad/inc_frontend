@@ -292,6 +292,8 @@ export const retractBatch = async (batchId: string, force = false) => {
 export interface BatchSummary {
     _id: string;
     batchCode: string;
+    label?: string;
+    notes?: string;
     stage: 'intake' | 'shipped' | 'arrived';
     totalItems?: number;
     newItems?: number;
@@ -300,6 +302,15 @@ export interface BatchSummary {
     createdAt?: string;
     uploadedBy?: { name?: string; email?: string } | null;
 }
+
+/**
+ * Staff: rename / edit notes on an upload batch.
+ * PATCH /api/batches/:id
+ */
+export const updateBatch = async (batchId: string, payload: { label?: string; notes?: string }) => {
+    const { data: envelope } = await api.patch(`/api/batches/${batchId}`, payload);
+    return envelope.data as BatchSummary;
+};
 
 /**
  * Staff: recent upload batches (newest first), for the upload manager.

@@ -6,11 +6,12 @@ import CreateShipmentModal from "@/components/dashboard/CreateShipmentModal";
 import BulkUploadModal from "@/components/dashboard/BulkUploadModal";
 import EditItemModal from "@/components/dashboard/EditItemModal";
 import ExpandableUploadCard from "@/components/dashboard/ExpandableUploadCard";
+import BatchEditModal from "@/components/dashboard/BatchEditModal";
 import { Ship, CheckCircle, Clock, Plus, Power, FileUp, RefreshCw, Anchor, Package, Warehouse, Search, AlertTriangle } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import Button from "@/components/common/Button";
 import { useDebounce } from "@/hooks/useDebounce";
-import { getBatchShipments, getEmployeeStats, deleteBatchItem, getBatches, fetchBatchItems, type BatchSummary } from "@/services/shipments";
+import { getBatchShipments, getEmployeeStats, deleteBatchItem, getBatches, fetchBatchItems, retractBatch, type BatchSummary } from "@/services/shipments";
 import { listContainerLoadingsStaff, deleteContainerLoading, type ContainerLoading } from "@/services/containerLoadings";
 import ContainerLoadingModal from "@/components/dashboard/ContainerLoadingModal";
 import { useAuth } from "@/context/AuthContext";
@@ -42,6 +43,10 @@ export default function EmployeeDashboard() {
     const [containerModalOpen, setContainerModalOpen] = useState(false);
     const [editingContainer, setEditingContainer]   = useState<ContainerLoading | undefined>(undefined);
     const [deletingContainerId, setDeletingContainerId] = useState<string | null>(null);
+
+    // Batch (Goods Received / Arrived upload) edit + delete state
+    const [editingBatch, setEditingBatch] = useState<BatchSummary | null>(null);
+    const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
 
     const fetchStats = useCallback(async () => {
         try {
@@ -110,6 +115,24 @@ export default function EmployeeDashboard() {
             fetchStats();
         } catch (err: any) {
             alert(err?.response?.data?.message || "Failed to delete shipment. Please try again.");
+        }
+    };
+
+    const handleDeleteBatch = async (b: BatchSummary) => {
+        const noun = b.stage === 'arrived' ? 'arrival upload' : 'goods-received upload';
+        const ok = window.confirm(
+            `Delete this ${noun} (${b.label || b.batchCode})?\n\nThis reverses everything the upload did — its ${b.totalItems ?? 0} item(s) are removed/rolled back. This cannot be undone.`
+        );
+        if (!ok) return;
+        setDeletingBatchId(b._id);
+        try {
+            await retractBatch(b._id);
+            setBatchGroups((prev) => prev.filter((x) => x._id !== b._id));
+            fetchStats();
+        } catch (err: any) {
+            alert(err?.response?.data?.message || "Failed to delete this upload. Please try again.");
+        } finally {
+            setDeletingBatchId(null);
         }
     };
 
@@ -324,7 +347,7 @@ export default function EmployeeDashboard() {
                                         {batchGroups.map((b) => (
                                             <ExpandableUploadCard
                                                 key={b._id}
-                                                title={b.batchCode}
+                                                title={b.label || b.batchCode}
                                                 icon={activeList === 'goods_received'
                                                     ? <Warehouse size={16} className="text-[#039B81] shrink-0" />
                                                     : <Package size={16} className="text-purple-500 shrink-0" />}
@@ -333,6 +356,9 @@ export default function EmployeeDashboard() {
                                                     ...(b.createdAt ? [{ label: "Uploaded", value: new Date(b.createdAt).toLocaleDateString("en-GB") }] : []),
                                                     ...((b.heldItems ?? 0) > 0 ? [{ label: "Held", value: String(b.heldItems) }] : []),
                                                 ]}
+                                                onEdit={() => setEditingBatch(b)}
+                                                onDelete={() => handleDeleteBatch(b)}
+                                                deleting={deletingBatchId === b._id}
                                                 loadItems={async () => (await fetchBatchItems(b._id)).items}
                                                 onEditItem={setEditingItem}
                                                 onDeleteItem={handleDeleteItem}
@@ -367,6 +393,17 @@ export default function EmployeeDashboard() {
                             setEditingItem(null);
                             setItemsRefreshKey((k) => k + 1);
                             fetchStats();
+                        }}
+                    />
+                )}
+
+                {editingBatch && (
+                    <BatchEditModal
+                        batch={editingBatch}
+                        onClose={() => setEditingBatch(null)}
+                        onSaved={(updated) => {
+                            setBatchGroups((prev) => prev.map((b) => (b._id === updated._id ? { ...b, ...updated } : b)));
+                            setEditingBatch(null);
                         }}
                     />
                 )}
