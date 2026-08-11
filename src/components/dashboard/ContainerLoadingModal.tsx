@@ -1,18 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { X, Ship } from "lucide-react";
+import { X, Ship, AlertTriangle } from "lucide-react";
 import Button from "@/components/common/Button";
 import {
     createContainerLoading,
     updateContainerLoading,
     type ContainerLoading,
 } from "@/services/containerLoadings";
+import { CONTAINER_TO_ITEM_STATUS } from "@/config/statusOptions";
+import { STATUS_LABELS } from "@/config/constants";
+
+/** What each container status means for the shipments loaded in it. */
+const ITEM_STATUS_LABEL: Record<string, string> = Object.fromEntries(
+    Object.entries(CONTAINER_TO_ITEM_STATUS).map(([container, item]) => [
+        container,
+        STATUS_LABELS[item] ?? item,
+    ])
+);
 
 interface Props {
     existing?: ContainerLoading;
     onClose: () => void;
-    onSaved: (c: ContainerLoading) => void;
+    /** `synced` is true when the save moved the shipments loaded in the container. */
+    onSaved: (c: ContainerLoading, synced: boolean) => void;
 }
 
 const STATUS_OPTIONS = [
@@ -50,6 +61,11 @@ export default function ContainerLoadingModal({ existing, onClose, onSaved }: Pr
 
     const [saving, setSaving] = useState(false);
     const [error, setError]   = useState<string | null>(null);
+    const [result, setResult] = useState<string | null>(null);
+
+    // Moving the container moves its cargo — warn before it happens.
+    const statusChanged = isEdit && form.status !== existing?.status;
+    const newStatusLabel = STATUS_OPTIONS.find((o) => o.value === form.status)?.label ?? form.status;
 
     const fi = "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:border-[#039B81]/50 focus:ring-2 focus:ring-[#039B81]/10 transition-all";
 
@@ -58,8 +74,19 @@ export default function ContainerLoadingModal({ existing, onClose, onSaved }: Pr
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (statusChanged) {
+            const ok = window.confirm(
+                `Move container ${existing?.containerNumber} to ${newStatusLabel}?\n\n` +
+                `Every shipment loaded in it moves too, and each customer sees the change on their ` +
+                `tracking page. Items that are on hold, delivered, returned or failed are left untouched.`
+            );
+            if (!ok) return;
+        }
+
         setSaving(true);
         setError(null);
+        setResult(null);
 
         const payload: any = { ...form };
         // Convert empty strings to undefined so the backend doesn't save empty dates
@@ -68,14 +95,18 @@ export default function ContainerLoadingModal({ existing, onClose, onSaved }: Pr
         });
 
         try {
-            let saved: ContainerLoading;
             if (isEdit && existing) {
                 const { containerNumber: _cn, ...updatePayload } = payload;
-                saved = await updateContainerLoading(existing._id, updatePayload);
+                const { container, message } = await updateContainerLoading(existing._id, updatePayload);
+                onSaved(container, statusChanged);
+                // A status move touched customer-visible records — stay open and
+                // report what it did rather than closing silently.
+                if (statusChanged) setResult(message);
+                else onClose();
             } else {
-                saved = await createContainerLoading(payload);
+                onSaved(await createContainerLoading(payload), false);
+                onClose();
             }
-            onSaved(saved);
         } catch (err: any) {
             const msg = err?.response?.data?.message || "Failed to save. Please try again.";
             setError(msg);
@@ -115,6 +146,12 @@ export default function ContainerLoadingModal({ existing, onClose, onSaved }: Pr
                         </div>
                     )}
 
+                    {result && (
+                        <div className="bg-[#039B81]/5 border border-[#039B81]/20 text-[#039B81] rounded-xl px-4 py-3 text-sm font-bold">
+                            {result}
+                        </div>
+                    )}
+
                     {/* Container Number — read-only when editing */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Field label="Container Number *" required={!isEdit}>
@@ -135,6 +172,17 @@ export default function ContainerLoadingModal({ existing, onClose, onSaved }: Pr
                             </select>
                         </Field>
                     </div>
+
+                    {statusChanged && (
+                        <div className="flex gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                            <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-amber-700 font-semibold leading-relaxed">
+                                Saving moves every shipment in this container to{" "}
+                                <span className="font-black">{ITEM_STATUS_LABEL[form.status] ?? newStatusLabel}</span> and updates
+                                each customer&apos;s tracking page. On-hold, delivered, returned and failed items are skipped.
+                            </p>
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Field label="Vessel Name">
@@ -202,7 +250,7 @@ export default function ContainerLoadingModal({ existing, onClose, onSaved }: Pr
                 {/* Footer */}
                 <div className="p-6 border-t border-slate-100 bg-white flex justify-end gap-3 shrink-0">
                     <Button variant="outline" onClick={onClose} className="px-6 py-2.5 text-[10px] font-black uppercase tracking-widest">
-                        Cancel
+                        {result ? "Done" : "Cancel"}
                     </Button>
                     <Button
                         type="submit"

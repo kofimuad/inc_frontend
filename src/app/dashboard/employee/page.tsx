@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback } from "react";
 import Button from "@/components/common/Button";
 import { useDebounce } from "@/hooks/useDebounce";
 import { getBatchShipments, getEmployeeStats, deleteBatchItem, getBatches, fetchBatchItems, retractBatch, type BatchSummary } from "@/services/shipments";
-import { listContainerLoadingsStaff, deleteContainerLoading, type ContainerLoading } from "@/services/containerLoadings";
+import { listContainerLoadingsStaff, deleteContainerLoading, listContainerItems, type ContainerLoading } from "@/services/containerLoadings";
 import ContainerLoadingModal from "@/components/dashboard/ContainerLoadingModal";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/common/ProtectedRoute";
@@ -321,11 +321,10 @@ export default function EmployeeDashboard() {
                                                 onEdit={() => { setEditingContainer(c); setContainerModalOpen(true); }}
                                                 onDelete={() => handleDeleteContainer(c)}
                                                 deleting={deletingContainerId === c._id}
-                                                loadItems={async () => {
-                                                    const bid = c.batchRef?._id || c.batchRef;
-                                                    if (!bid) return [];
-                                                    return (await fetchBatchItems(bid)).items;
-                                                }}
+                                                // Everything on this container — items from the packing
+                                                // list that created it plus any attached by hand from
+                                                // the Goods Received tab.
+                                                loadItems={async () => (await listContainerItems(c._id)).items}
                                                 onEditItem={setEditingItem}
                                                 onDeleteItem={handleDeleteItem}
                                                 statusColor={getStatusColor}
@@ -391,8 +390,9 @@ export default function EmployeeDashboard() {
                         onClose={() => setEditingItem(null)}
                         onSaved={() => {
                             setEditingItem(null);
-                            setItemsRefreshKey((k) => k + 1);
-                            fetchStats();
+                            // The same record backs all three tabs — an edit here
+                            // (a container ref, a status) can move it between them.
+                            refresh();
                         }}
                     />
                 )}
@@ -401,9 +401,11 @@ export default function EmployeeDashboard() {
                     <BatchEditModal
                         batch={editingBatch}
                         onClose={() => setEditingBatch(null)}
-                        onSaved={(updated) => {
+                        onSaved={(updated, synced) => {
                             setBatchGroups((prev) => prev.map((b) => (b._id === updated._id ? { ...b, ...updated } : b)));
-                            setEditingBatch(null);
+                            // A bulk status change moves items other tabs also show.
+                            if (synced) refresh();
+                            else setEditingBatch(null);
                         }}
                     />
                 )}
@@ -412,8 +414,7 @@ export default function EmployeeDashboard() {
                     <ContainerLoadingModal
                         existing={editingContainer}
                         onClose={() => setContainerModalOpen(false)}
-                        onSaved={(saved) => {
-                            setContainerModalOpen(false);
+                        onSaved={(saved, synced) => {
                             setContainers((prev) => {
                                 const idx = prev.findIndex((c) => c._id === saved._id);
                                 if (idx >= 0) {
@@ -423,6 +424,9 @@ export default function EmployeeDashboard() {
                                 }
                                 return [saved, ...prev];
                             });
+                            // Moving the container moved its cargo — the Goods
+                            // Received and Arrived lists are stale now.
+                            if (synced) refresh();
                         }}
                     />
                 )}

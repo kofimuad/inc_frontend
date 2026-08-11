@@ -12,15 +12,19 @@ import { getSettings, resolveCbmRate, LOCATION_OPTIONS, DEFAULT_SETTINGS, AppSet
 const STATUS_STYLES: Record<string, string> = {
     in_warehouse:    "bg-blue-50 text-blue-700",
     shipped:         "bg-[#039B81]/10 text-[#039B81]",
+    at_port:         "bg-orange-50 text-orange-700",
     customs:         "bg-purple-50 text-purple-700",
-    out_for_delivery:"bg-orange-50 text-orange-700",
+    ready_for_pickup:"bg-emerald-50 text-emerald-700",
+    out_for_delivery:"bg-cyan-50 text-cyan-700",
     delivered:       "bg-emerald-50 text-emerald-700",
     held:            "bg-amber-50 text-amber-700",
 };
 const STATUS_LABELS: Record<string, string> = {
     in_warehouse:    "In Warehouse",
     shipped:         "Shipped",
+    at_port:         "At Tema Port",
     customs:         "Customs",
+    ready_for_pickup:"Ready for Pickup",
     out_for_delivery:"Out for Delivery",
     delivered:       "Delivered",
     held:            "On Hold",

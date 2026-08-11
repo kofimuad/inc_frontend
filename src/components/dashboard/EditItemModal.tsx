@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X, AlertTriangle, Save } from "lucide-react";
 import Button from "@/components/common/Button";
 import { updateBatchItem } from "@/services/shipments";
+import { STATUS_OPTIONS } from "@/config/statusOptions";
 
 interface EditItemModalProps {
     item: any;
@@ -65,19 +66,6 @@ const FIELD_GROUPS: { group: string; fields: FieldDef[] }[] = [
 function isEmpty(val: any): boolean {
     return val === null || val === undefined || String(val).trim() === "";
 }
-
-// Statuses staff can set manually (e.g. when the automatic waybill match missed
-// an item that has physically left the warehouse).
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-    { value: "in_warehouse",     label: "In Warehouse" },
-    { value: "shipped",          label: "Shipped" },
-    { value: "customs",          label: "At Port / Customs" },
-    { value: "out_for_delivery", label: "Out for Delivery" },
-    { value: "delivered",        label: "Delivered" },
-    { value: "held",             label: "On Hold" },
-    { value: "returned",         label: "Returned" },
-    { value: "failed",           label: "Failed" },
-];
 
 export default function EditItemModal({ item, onClose, onSaved }: EditItemModalProps) {
     const [form, setForm] = useState<Record<string, any>>(() => {
@@ -176,6 +164,9 @@ export default function EditItemModal({ item, onClose, onSaved }: EditItemModalP
                                 </select>
                                 <p className="text-[10px] text-slate-400 font-medium mt-0.5">
                                     Change this to move an item the packing-list upload didn&apos;t catch. Recorded in the timeline.
+                                    Setting a <span className="font-black">Container Ref</span> below attaches this shipment to that
+                                    container — it then picks up the container&apos;s ETA and status, and appears under it on the
+                                    Container Loadings tab.
                                 </p>
                             </div>
                         </div>

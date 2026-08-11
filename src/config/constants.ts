@@ -15,9 +15,11 @@ export const SHIPMENT_STATUSES = {
     DELIVERED: 'delivered',
     FAILED: 'failed',
     RETURNED: 'returned',
-    // Batch workflow
+    // Batch workflow — mirrors the ContainerLoading lifecycle
     IN_WAREHOUSE: 'in_warehouse',
     SHIPPED: 'shipped',
+    AT_PORT: 'at_port',
+    READY_FOR_PICKUP: 'ready_for_pickup',
     HELD: 'held',
 } as const;
 
@@ -32,6 +34,8 @@ export const STATUS_LABELS: Record<string, string> = {
     [SHIPMENT_STATUSES.RETURNED]: 'Returned',
     [SHIPMENT_STATUSES.IN_WAREHOUSE]: 'In Warehouse',
     [SHIPMENT_STATUSES.SHIPPED]: 'Shipped',
+    [SHIPMENT_STATUSES.AT_PORT]: 'At Tema Port',
+    [SHIPMENT_STATUSES.READY_FOR_PICKUP]: 'Ready for Pickup',
     [SHIPMENT_STATUSES.HELD]: 'On Hold',
 };
 
@@ -46,6 +50,8 @@ export const STATUS_COLORS: Record<string, string> = {
     [SHIPMENT_STATUSES.RETURNED]: 'bg-orange-100 text-orange-700',
     [SHIPMENT_STATUSES.IN_WAREHOUSE]: 'bg-amber-100 text-amber-700',
     [SHIPMENT_STATUSES.SHIPPED]: 'bg-sky-100 text-sky-700',
+    [SHIPMENT_STATUSES.AT_PORT]: 'bg-orange-100 text-orange-700',
+    [SHIPMENT_STATUSES.READY_FOR_PICKUP]: 'bg-emerald-100 text-emerald-700',
     [SHIPMENT_STATUSES.HELD]: 'bg-teal-100 text-teal-700',
     default: 'bg-slate-100 text-slate-700',
 };

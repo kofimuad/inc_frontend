@@ -304,12 +304,18 @@ export interface BatchSummary {
 }
 
 /**
- * Staff: rename / edit notes on an upload batch.
+ * Staff: rename / edit notes on an upload batch, and optionally move every
+ * shipment in it to one status (the upload-level equivalent of advancing a
+ * container). Returns the server message too, because a bulk status change
+ * reports how many items moved and how many were skipped.
  * PATCH /api/batches/:id
  */
-export const updateBatch = async (batchId: string, payload: { label?: string; notes?: string }) => {
+export const updateBatch = async (
+    batchId: string,
+    payload: { label?: string; notes?: string; status?: string }
+) => {
     const { data: envelope } = await api.patch(`/api/batches/${batchId}`, payload);
-    return envelope.data as BatchSummary;
+    return { batch: envelope.data as BatchSummary, message: envelope.message as string };
 };
 
 /**

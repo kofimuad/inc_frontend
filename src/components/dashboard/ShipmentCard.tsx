@@ -25,6 +25,12 @@ const statusColors: Record<string, string> = {
     "out_for_delivery": "bg-cyan-100 text-cyan-700",
     "failed": "bg-red-100 text-red-700",
     "returned": "bg-orange-100 text-orange-700",
+    // Batch workflow statuses
+    "in_warehouse": "bg-amber-100 text-amber-700",
+    "shipped": "bg-sky-100 text-sky-700",
+    "at_port": "bg-orange-100 text-orange-700",
+    "ready_for_pickup": "bg-emerald-100 text-emerald-700",
+    "held": "bg-teal-100 text-teal-700",
 };
 
 const ShipmentCard: React.FC<ShipmentCardProps> = ({

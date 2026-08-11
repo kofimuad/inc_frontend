@@ -10,6 +10,7 @@ import {
     searchContainerLoadings,
     type ContainerLoading,
 } from "@/services/containerLoadings";
+import { STATUS_LABELS } from "@/config/constants";
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
@@ -32,16 +33,21 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function ItemStatusBadge({ status }: { status: string }) {
+    // Shipment statuses — these mirror the container lifecycle (see
+    // CONTAINER_TO_ITEM_STATUS), so "arrived" is never an item status.
     const colors: Record<string, string> = {
-        in_warehouse: "bg-yellow-50 text-yellow-600",
-        shipped:      "bg-blue-50 text-blue-600",
-        arrived:      "bg-emerald-50 text-emerald-600",
-        delivered:    "bg-[#039B81]/10 text-[#039B81]",
-        held:         "bg-red-50 text-red-500",
+        in_warehouse:     "bg-yellow-50 text-yellow-600",
+        shipped:          "bg-blue-50 text-blue-600",
+        at_port:          "bg-orange-50 text-orange-600",
+        customs:          "bg-purple-50 text-purple-600",
+        ready_for_pickup: "bg-emerald-50 text-emerald-600",
+        out_for_delivery: "bg-cyan-50 text-cyan-600",
+        delivered:        "bg-[#039B81]/10 text-[#039B81]",
+        held:             "bg-red-50 text-red-500",
     };
     return (
         <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${colors[status] || "bg-slate-100 text-slate-500"}`}>
-            {status.replace(/_/g, " ")}
+            {STATUS_LABELS[status] || status.replace(/_/g, " ")}
         </span>
     );
 }

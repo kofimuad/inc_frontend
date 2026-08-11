@@ -70,9 +70,25 @@ export async function createContainerLoading(payload: Partial<ContainerLoading>)
     return data.data as ContainerLoading;
 }
 
+/**
+ * Staff: update a container. Changing its status moves every shipment loaded in
+ * it, so the server message reports what was synced and what was skipped —
+ * return it alongside the record.
+ */
 export async function updateContainerLoading(id: string, payload: Partial<ContainerLoading>) {
     const { data } = await api.patch(`/api/container-loadings/${id}`, payload);
-    return data.data as ContainerLoading;
+    return { container: data.data as ContainerLoading, message: data.message as string };
+}
+
+/**
+ * Staff: every shipment on this container — those assigned by container ref
+ * (including ones attached by hand from the Goods Received tab) plus those from
+ * the packing list that created it.
+ * GET /api/container-loadings/:id/items
+ */
+export async function listContainerItems(id: string, params?: { status?: string }) {
+    const { data } = await api.get(`/api/container-loadings/${id}/items`, { params });
+    return data.data as { items: any[]; total: number };
 }
 
 export async function deleteContainerLoading(id: string) {
