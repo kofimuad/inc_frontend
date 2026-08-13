@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Package } from "lucide-react";
+import { Search, Package, Phone } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
@@ -15,6 +15,9 @@ const sliderImages = [
 
 export default function HeroSection() {
   const [trackingNumber, setTrackingNumber] = useState("");
+  // Optional second identifier, for the tracking numbers that cover several
+  // customers' goods. Carried through to the tracking page as `id`.
+  const [identifier, setIdentifier] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const router = useRouter();
 
@@ -30,7 +33,10 @@ export default function HeroSection() {
     e.preventDefault();
     const query = trackingNumber.trim();
     if (!query) return;
-    router.push(`/tracking?q=${encodeURIComponent(query)}`);
+    const id = identifier.trim();
+    router.push(
+      `/tracking?q=${encodeURIComponent(query)}${id ? `&id=${encodeURIComponent(id)}` : ""}`,
+    );
   };
 
   return (
@@ -48,27 +54,44 @@ export default function HeroSection() {
             onSubmit={handleTrack}
             className="max-w-2xl mx-auto mb-16 relative z-20"
           >
-            <div className="bg-white border border-teal-100 p-2 rounded-lg shadow-sm flex flex-col sm:flex-row gap-2">
-              <div className="relative grow">
-                <Package
+            <div className="bg-white border border-teal-100 p-2 rounded-lg shadow-sm flex flex-col gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative grow">
+                  <Package
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                    size={20}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Enter your tracking number..."
+                    value={trackingNumber}
+                    onChange={(e) => setTrackingNumber(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-gray-50 text-gray-900 rounded-md placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#039B81]"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="flex items-center justify-center gap-2 px-8 py-3 bg-[#039B81] hover:bg-[#027a65] text-white font-semibold rounded-md transition-colors"
+                >
+                  <Search size={20} />
+                  <span>Track</span>
+                </button>
+              </div>
+              {/* Some tracking numbers cover several customers' goods — this is
+                  how a customer says which of them is theirs. */}
+              <div className="relative">
+                <Phone
                   className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-                  size={20}
+                  size={18}
                 />
                 <input
                   type="text"
-                  placeholder="Enter your tracking number..."
-                  value={trackingNumber}
-                  onChange={(e) => setTrackingNumber(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-gray-50 text-gray-900 rounded-md placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#039B81]"
+                  placeholder="Phone number or shipping mark (optional)"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  className="w-full pl-12 pr-4 py-2.5 bg-gray-50 text-gray-900 text-sm rounded-md placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#039B81]"
                 />
               </div>
-              <button
-                type="submit"
-                className="flex items-center justify-center gap-2 px-8 py-3 bg-[#039B81] hover:bg-[#027a65] text-white font-semibold rounded-md transition-colors"
-              >
-                <Search size={20} />
-                <span>Track</span>
-              </button>
             </div>
           </form>
 

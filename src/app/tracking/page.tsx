@@ -71,10 +71,12 @@ type TrackResult = {
 function TrackingContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get("q") || "";
+  // Phone number or shipping mark carried over from the homepage search box.
+  const initialId = searchParams.get("id") || "";
   const [trackingInput, setTrackingInput] = useState(initialQuery);
   // Optional second identifier: a phone number, or a shipping mark for the
   // customers whose records carry no phone at all.
-  const [identifierInput, setIdentifierInput] = useState("");
+  const [identifierInput, setIdentifierInput] = useState(initialId);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [results, setResults] = useState<TrackResult[]>([]);
@@ -172,12 +174,16 @@ function TrackingContent() {
   };
 
   useEffect(() => {
-    if (!initialQuery || lastAutoSearch.current === initialQuery) return;
+    // Keyed on both values, so arriving from the homepage with an identifier
+    // runs the narrowed search rather than the bare tracking-number one.
+    const key = `${initialQuery}::${initialId}`;
+    if (!initialQuery || lastAutoSearch.current === key) return;
 
-    lastAutoSearch.current = initialQuery;
+    lastAutoSearch.current = key;
     setTrackingInput(initialQuery);
-    void runTrackSearch(initialQuery);
-  }, [initialQuery]);
+    setIdentifierInput(initialId);
+    void runTrackSearch(initialQuery, initialId);
+  }, [initialQuery, initialId]);
 
   const handleTrack = async (e: React.FormEvent) => {
     e.preventDefault();
