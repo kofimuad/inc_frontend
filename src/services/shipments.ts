@@ -9,13 +9,55 @@ import {
 // ═══════════════════════════════════════════════════
 
 /**
- * Public tracking page — no account needed
- * GET /api/tracking/{trackingNumber}
- * Returns { shipment, events }
+ * One customer's entry on a shared tracking number, with identifying details
+ * partly masked. Shown so a customer can pick themselves out without learning
+ * anyone else's name or number.
  */
-export const getPublicTracking = async (trackingNumber: string) => {
-    const { data: envelope } = await api.get(`/api/tracking/${trackingNumber}`);
-    return envelope.data;
+export interface TrackingChoice {
+    customerName: string | null;
+    customerPhone: string | null;
+    shippingMark: string | null;
+    destinationCity: string | null;
+    status: string;
+}
+
+/**
+ * Public tracking page — no account needed
+ * GET /api/tracking/{trackingNumber}?phone=&mark=
+ *
+ * A tracking number can be shared by several customers on a consolidated
+ * shipment. Pass `phone` or `mark` to narrow it to one of them; without either,
+ * a shared number comes back with `ambiguous: true` and masked `choices`
+ * instead of somebody else's shipment.
+ */
+export const getPublicTracking = async (
+    trackingNumber: string,
+    identifier?: { phone?: string; mark?: string },
+) => {
+    const params: Record<string, string> = {};
+    if (identifier?.phone) params.phone = identifier.phone;
+    if (identifier?.mark) params.mark = identifier.mark;
+
+    const { data: envelope } = await api.get(`/api/tracking/${trackingNumber}`, { params });
+    return envelope.data as {
+        ambiguous?: boolean;
+        total?: number;
+        choices?: TrackingChoice[];
+        items?: any[];
+        [key: string]: any;
+    };
+};
+
+/**
+ * Public: Look up all shipments for a shipping mark (no auth needed)
+ * GET /api/tracking/mark/{mark}
+ *
+ * The only route in for customers whose sheets carried a mark rather than a
+ * phone number.
+ */
+export const getPublicTrackingByMark = async (mark: string) => {
+    const { data: envelope } = await api.get(`/api/tracking/mark/${encodeURIComponent(mark)}`);
+    return envelope.data as { total: number; items: any[] };
 };
 
 /**

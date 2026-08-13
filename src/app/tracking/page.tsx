@@ -9,9 +9,11 @@ import {
   CheckCircle,
   Clock,
   MapPin,
+  Phone,
+  Users,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { getPublicTracking } from "@/services/shipments";
+import { getPublicTracking, type TrackingChoice } from "@/services/shipments";
 import {
   searchContainerLoadings,
   type ContainerLoading,
@@ -59,50 +61,94 @@ type TrackResult = {
   containerItem: any | null;
   events: any[];
   found: boolean;
+  // A consolidated tracking number carries several customers' goods. When one
+  // is searched without an identifier, the server withholds the shipments and
+  // returns masked entries to choose from instead.
+  ambiguous?: boolean;
+  choices?: TrackingChoice[];
 };
 
 function TrackingContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get("q") || "";
   const [trackingInput, setTrackingInput] = useState(initialQuery);
+  // Optional second identifier: a phone number, or a shipping mark for the
+  // customers whose records carry no phone at all.
+  const [identifierInput, setIdentifierInput] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [results, setResults] = useState<TrackResult[]>([]);
+  const [noMatchFor, setNoMatchFor] = useState<string[]>([]);
   const lastAutoSearch = useRef<string>("");
 
-  const runTrackSearch = async (inputValue: string) => {
+  // A mark is anything with a letter in it ("ACC-28672", "ANGIE"); anything
+  // else is treated as a phone number. Mirrors how the backend reads the
+  // CONTACT column on the spreadsheets.
+  const buildIdentifier = (raw: string) => {
+    const value = raw.trim();
+    if (!value) return undefined;
+    return /[A-Za-z]/.test(value) ? { mark: value } : { phone: value };
+  };
+
+  const runTrackSearch = async (inputValue: string, identifierValue = "") => {
     const numbers = inputValue
       .split(",")
       .map((n) => n.trim())
       .filter(Boolean);
     if (numbers.length === 0) return;
 
+    const identifier = buildIdentifier(identifierValue);
+
     setIsSearching(true);
     const settled = await Promise.allSettled(
-      numbers.map(async (num) => {
-        const shipmentData = await getPublicTracking(num);
+      numbers.map(async (num): Promise<TrackResult[]> => {
+        const shipmentData = await getPublicTracking(num, identifier);
+
+        if (shipmentData?.ambiguous) {
+          return [
+            {
+              trackingNumber: num,
+              shipment: null,
+              container: null,
+              containerItem: null,
+              events: [],
+              found: false,
+              ambiguous: true,
+              choices: shipmentData.choices ?? [],
+            },
+          ];
+        }
+
         // Fetch container data in parallel — silently ignore if not found
         const containerSearch = await searchContainerLoadings(num).catch(
           () => null,
         );
         const container = containerSearch?.waybillMatch?.container ?? null;
         const containerItem = containerSearch?.waybillMatch?.item ?? null;
-        return {
+
+        // One number can resolve to several shipments — a customer with more
+        // than one parcel under it, or an unshared number narrowed by nothing.
+        // Render a row for each rather than silently showing only the first.
+        const shipments: any[] = shipmentData?.items?.length
+          ? shipmentData.items
+          : [shipmentData];
+
+        return shipments.map((s: any) => ({
           trackingNumber: num,
-          shipment: shipmentData,
+          shipment: s,
           container,
           containerItem,
-          events: shipmentData?.timeline || [],
+          events: s?.timeline || [],
           found: true,
-        };
+        }));
       }),
     );
 
-    setResults(
-      settled.map((res, i) =>
-        res.status === "fulfilled"
-          ? res.value
-          : {
+    const next = settled.flatMap((res, i) =>
+      res.status === "fulfilled"
+        ? res.value
+        : [
+            {
               trackingNumber: numbers[i],
               shipment: null,
               container: null,
@@ -110,7 +156,16 @@ function TrackingContent() {
               events: [],
               found: false,
             },
-      ),
+          ],
+    );
+
+    setResults(next);
+    // An identifier that matched nothing is a different failure from an unknown
+    // tracking number, and deserves its own message.
+    setNoMatchFor(
+      identifier
+        ? next.filter((r) => !r.found && !r.ambiguous).map((r) => r.trackingNumber)
+        : [],
     );
     setHasSearched(true);
     setIsSearching(false);
@@ -126,12 +181,13 @@ function TrackingContent() {
 
   const handleTrack = async (e: React.FormEvent) => {
     e.preventDefault();
-    await runTrackSearch(trackingInput);
+    await runTrackSearch(trackingInput, identifierInput);
   };
 
   const foundResults = results.filter((r) => r.found);
+  const ambiguousResults = results.filter((r) => r.ambiguous);
   const notFoundNumbers = results
-    .filter((r) => !r.found)
+    .filter((r) => !r.found && !r.ambiguous && !noMatchFor.includes(r.trackingNumber))
     .map((r) => r.trackingNumber);
 
   return (
@@ -150,36 +206,54 @@ function TrackingContent() {
             {/* Tracking Form */}
             <form
               onSubmit={handleTrack}
-              className="bg-white rounded-2xl p-2 flex flex-col sm:flex-row gap-2 shadow-2xl shadow-slate-200 border border-slate-100"
+              className="bg-white rounded-2xl p-2 flex flex-col gap-2 shadow-2xl shadow-slate-200 border border-slate-100"
             >
-              <div className="relative grow">
-                <Package
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative grow">
+                  <Package
+                    className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"
+                    size={20}
+                  />
+                  <input
+                    type="text"
+                    placeholder="e.g. GH377033115, GH377033116"
+                    value={trackingInput}
+                    onChange={(e) => setTrackingInput(e.target.value)}
+                    className="w-full pl-14 pr-4 py-4 rounded-xl bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:bg-white focus:border-[#039B81]/30 transition-all font-medium text-sm"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isSearching}
+                  className="flex items-center justify-center gap-2 px-8 py-4 bg-[#039B81] hover:bg-[#027a65] disabled:bg-slate-300 disabled:shadow-none text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-[#039B81]/20 shrink-0"
+                >
+                  {isSearching ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Search size={18} />
+                  )}
+                  <span>{isSearching ? "Searching..." : "Track Item"}</span>
+                </button>
+              </div>
+              {/* Some tracking numbers cover several customers' goods, so this
+                  is how a customer says which of them is theirs. */}
+              <div className="relative">
+                <Phone
                   className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"
-                  size={20}
+                  size={18}
                 />
                 <input
                   type="text"
-                  placeholder="e.g. GH377033115, GH377033116"
-                  value={trackingInput}
-                  onChange={(e) => setTrackingInput(e.target.value)}
-                  className="w-full pl-14 pr-4 py-4 rounded-xl bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:bg-white focus:border-[#039B81]/30 transition-all font-medium text-sm"
+                  placeholder="Phone number or shipping mark (optional)"
+                  value={identifierInput}
+                  onChange={(e) => setIdentifierInput(e.target.value)}
+                  className="w-full pl-14 pr-4 py-3 rounded-xl bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:bg-white focus:border-[#039B81]/30 transition-all font-medium text-sm"
                 />
               </div>
-              <button
-                type="submit"
-                disabled={isSearching}
-                className="flex items-center justify-center gap-2 px-8 py-4 bg-[#039B81] hover:bg-[#027a65] disabled:bg-slate-300 disabled:shadow-none text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-[#039B81]/20 shrink-0"
-              >
-                {isSearching ? (
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Search size={18} />
-                )}
-                <span>{isSearching ? "Searching..." : "Track Item"}</span>
-              </button>
             </form>
             <p className="text-xs text-slate-400 font-medium mt-3">
-              Separate multiple tracking numbers with commas
+              Separate multiple tracking numbers with commas. Add your phone
+              number or shipping mark if a number covers more than one customer.
             </p>
           </div>
         </div>
@@ -201,8 +275,91 @@ function TrackingContent() {
             </div>
           )}
 
+          {/* Shared tracking number — ask which customer they are */}
+          {hasSearched && ambiguousResults.length > 0 && (
+            <div className="max-w-3xl mx-auto mb-8">
+              {ambiguousResults.map((r) => (
+                <div
+                  key={r.trackingNumber}
+                  className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6"
+                >
+                  <div className="px-6 py-5 border-b border-slate-100 flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+                      <Users className="text-amber-500" size={18} />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">
+                        More than one shipment
+                      </h2>
+                      <p className="text-sm text-slate-500 font-medium mt-1">
+                        Tracking number{" "}
+                        <span className="font-mono font-bold text-slate-700">
+                          {r.trackingNumber}
+                        </span>{" "}
+                        covers {r.choices?.length ?? 0} customers&apos; goods.
+                        Enter your phone number or shipping mark above to see
+                        yours.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="divide-y divide-slate-50">
+                    {(r.choices ?? []).map((c, i) => (
+                      <li
+                        key={i}
+                        className="px-6 py-4 flex flex-wrap items-center gap-x-6 gap-y-1"
+                      >
+                        <span className="text-sm font-bold text-slate-700 min-w-40">
+                          {c.customerName || "—"}
+                        </span>
+                        <span className="text-xs font-mono text-slate-400">
+                          {c.customerPhone || c.shippingMark || "—"}
+                        </span>
+                        {c.destinationCity && (
+                          <span className="text-xs font-medium text-slate-400">
+                            {c.destinationCity}
+                          </span>
+                        )}
+                        <span className="text-[10px] font-black tracking-widest uppercase text-slate-400 ml-auto">
+                          {STATUS_LABELS[c.status] || getStatusDisplay(c.status)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="px-6 py-3 bg-slate-50/60 text-[11px] text-slate-400 font-medium">
+                    Details are hidden until you confirm which shipment is
+                    yours.
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Identifier supplied, but it matched nothing on that number */}
+          {hasSearched && noMatchFor.length > 0 && (
+            <div className="max-w-2xl mx-auto text-center py-8">
+              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Phone className="text-amber-500" size={28} />
+              </div>
+              <h2 className="text-xl font-black text-slate-800 mb-2 tracking-tight">
+                No match for that phone or shipping mark
+              </h2>
+              <p className="text-slate-500 font-medium">
+                We found{" "}
+                <span className="font-bold">
+                  &quot;{noMatchFor.join('", "')}&quot;
+                </span>
+                , but nothing on it matches{" "}
+                <span className="font-bold">{identifierInput}</span>. Check the
+                number, or search without it to see how many shipments share it.
+              </p>
+            </div>
+          )}
+
           {/* All not found */}
-          {hasSearched && foundResults.length === 0 && (
+          {hasSearched &&
+            foundResults.length === 0 &&
+            ambiguousResults.length === 0 &&
+            noMatchFor.length === 0 && (
             <div className="max-w-2xl mx-auto text-center py-12">
               <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Clock className="text-amber-500" size={32} />
@@ -364,7 +521,7 @@ function TrackingContent() {
 
                         return (
                           <tr
-                            key={r.trackingNumber}
+                            key={`${r.trackingNumber}-${shippingMarkPhone || shippingMarkName || idx}`}
                             className={`hover:bg-slate-50/60 transition-colors ${idx !== foundResults.length - 1 ? "border-b border-slate-50" : ""}`}
                           >
                             <td className="px-4 py-4 text-sm text-slate-700 min-w-40">
@@ -430,9 +587,9 @@ function TrackingContent() {
               </div>
 
               {/* Timelines — one per found shipment */}
-              {foundResults.map((r) => (
+              {foundResults.map((r, ti) => (
                 <div
-                  key={r.trackingNumber}
+                  key={`${r.trackingNumber}-timeline-${ti}`}
                   className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 mb-6"
                 >
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8 flex items-center gap-3">
@@ -443,6 +600,13 @@ function TrackingContent() {
                         r.shipment?.trackingNumber ||
                         r.trackingNumber}
                     </span>
+                    {/* Several customers can share one number, so name whose
+                        timeline this is when more than one row came back. */}
+                    {foundResults.length > 1 && r.shipment?.customerName && (
+                      <span className="text-slate-400 font-bold normal-case tracking-normal">
+                        {r.shipment.customerName}
+                      </span>
+                    )}
                   </h3>
                   {r.events.length > 0 ? (
                     <div className="space-y-0">
