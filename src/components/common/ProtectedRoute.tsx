@@ -11,13 +11,15 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-    const { user, isAuthenticated, isLoading } = useAuth();
+    const { user, isAuthenticated, isLoading, sessionExpired } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
-        // If not loading and not authenticated, redirect to login
+        // If not loading and not authenticated, redirect to login. A session that
+        // timed out says so on arrival — previously the page simply emptied and
+        // left the user to guess.
         if (!isLoading && !isAuthenticated) {
-            router.push("/auth/login");
+            router.push(sessionExpired ? "/auth/login?expired=1" : "/auth/login");
             return;
         }
 
@@ -25,7 +27,7 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
         if (!isLoading && isAuthenticated && user && allowedRoles && !allowedRoles.includes(user.role)) {
             router.push("/");
         }
-    }, [isAuthenticated, isLoading, user, allowedRoles, router]);
+    }, [isAuthenticated, isLoading, user, allowedRoles, router, sessionExpired]);
 
     // Show loading state
     if (isLoading) {

@@ -3,7 +3,7 @@
 import Button from "@/components/common/Button";
 import Link from "next/link";
 import { useState, useEffect, Suspense } from "react";
-import { Mail, Lock, Phone, Eye, EyeOff, ArrowLeft, User } from "lucide-react";
+import { Mail, Lock, Phone, Eye, EyeOff, ArrowLeft, User, Clock } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthSlider from "@/components/common/AuthSlider";
@@ -348,6 +348,9 @@ function PhoneLoginForm() {
 function LoginForm() {
     useAutoRedirect();
     const [tab, setTab] = useState<"email" | "phone">("phone");
+    // Set by ProtectedRoute when a session ends on its own. Without it the user
+    // was bounced to this page with no idea why their dashboard had emptied.
+    const wasExpired = useSearchParams().get("expired") === "1";
 
     return (
         <div className="flex-grow flex flex-col justify-center max-w-md w-full mx-auto">
@@ -355,6 +358,19 @@ function LoginForm() {
                 <h1 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">Welcome Back</h1>
                 <p className="text-gray-500 text-sm">Sign in to track and manage your shipments.</p>
             </div>
+
+            {wasExpired && (
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+                    <Clock size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                        <p className="text-sm font-black text-amber-800">Your session timed out</p>
+                        <p className="text-xs text-amber-700 font-medium mt-0.5">
+                            You were signed out after a period of inactivity. Sign in again and
+                            your data will be right where you left it.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Tab toggle */}
             <div className="flex bg-gray-100 p-1 rounded-xl mb-8">
