@@ -57,8 +57,11 @@ const getStatusDisplay = (status: string) => {
 type TrackResult = {
   trackingNumber: string;
   shipment: any | null;
+  // The container only. Every customer-facing detail — name, phone, goods, CBM,
+  // quantity — comes from `shipment`, the record this customer was matched to.
+  // Reading any of it from a waybill-wide lookup showed one customer another
+  // customer's details whenever a tracking number was shared.
   container: ContainerLoading | null;
-  containerItem: any | null;
   events: any[];
   found: boolean;
   // A consolidated tracking number carries several customers' goods. When one
@@ -112,7 +115,6 @@ function TrackingContent() {
               trackingNumber: num,
               shipment: null,
               container: null,
-              containerItem: null,
               events: [],
               found: false,
               ambiguous: true,
@@ -121,12 +123,15 @@ function TrackingContent() {
           ];
         }
 
-        // Fetch container data in parallel — silently ignore if not found
-        const containerSearch = await searchContainerLoadings(num).catch(
-          () => null,
-        );
-        const container = containerSearch?.waybillMatch?.container ?? null;
-        const containerItem = containerSearch?.waybillMatch?.item ?? null;
+        // Container lookup — narrowed by the same identifier, so a shared
+        // number does not resolve to a stranger's container. Silently ignored
+        // if not found; it only supplies the loading date.
+        const containerSearch = await searchContainerLoadings(
+          num,
+          identifier,
+        ).catch(() => null);
+        const matchedContainer =
+          containerSearch?.waybillMatch?.container ?? null;
 
         // One number can resolve to several shipments — a customer with more
         // than one parcel under it, or an unshared number narrowed by nothing.
@@ -135,14 +140,24 @@ function TrackingContent() {
           ? shipmentData.items
           : [shipmentData];
 
-        return shipments.map((s: any) => ({
-          trackingNumber: num,
-          shipment: s,
-          container,
-          containerItem,
-          events: s?.timeline || [],
-          found: true,
-        }));
+        return shipments.map((s: any) => {
+          // Only trust the container when it is the one this shipment says it
+          // is on. Records on a shared number can sit on different containers.
+          const own = s?.containerNo || s?.containerRef;
+          const container =
+            matchedContainer &&
+            (!own || matchedContainer.containerNumber === String(own).toUpperCase())
+              ? matchedContainer
+              : null;
+
+          return {
+            trackingNumber: num,
+            shipment: s,
+            container,
+            events: s?.timeline || [],
+            found: true,
+          };
+        });
       }),
     );
 
@@ -154,7 +169,6 @@ function TrackingContent() {
               trackingNumber: numbers[i],
               shipment: null,
               container: null,
-              containerItem: null,
               events: [],
               found: false,
             },
@@ -460,9 +474,11 @@ function TrackingContent() {
                     </thead>
                     <tbody>
                       {foundResults.map((r, idx) => {
+                        // Every column below reads from `s` — this customer's
+                        // own record. `c` is the container, which is shared by
+                        // everyone on the number and carries nobody's details.
                         const s = r.shipment;
                         const c = r.container;
-                        const ci = r.containerItem;
                         const tracking =
                           s.waybillNo || s.trackingNumber || r.trackingNumber;
                         // Date Received = when goods were received at the origin
@@ -479,10 +495,8 @@ function TrackingContent() {
                           c?.etd ||
                           s.dates?.shippedAt ||
                           s.loadingDate;
-                        // CBM: try container item first (has it even if public API omits it), then shipment fields
-                        const cbm = ci?.cbm ?? s.cargo?.cbm ?? s.cbm ?? null;
+                        const cbm = s.cargo?.cbm ?? s.cbm ?? null;
                         const productName =
-                          ci?.productDescription ||
                           s.cargo?.description ||
                           s.cargo?.productDescription ||
                           s.productDescription ||
@@ -491,16 +505,16 @@ function TrackingContent() {
                           "—";
                         const qty =
                           s.cargo?.quantity ?? s.quantity ?? s.itemsCount ?? 0;
+                        // Name and contact must come from the same record, or a
+                        // shared tracking number pairs one customer's name with
+                        // another's phone number.
                         const shippingMarkName =
-                          ci?.customerName ||
-                          s.customerName ||
-                          s.cargo?.customerName ||
-                          "—";
+                          s.customerName || s.cargo?.customerName || "—";
                         const shippingMarkPhone =
                           s.customerPhoneRaw ||
                           s.customerPhone ||
-                          ci?.customerPhone ||
-                          s.cargo?.customerPhone ||
+                          s.shippingMarkRaw ||
+                          s.shippingMark ||
                           "";
                         const statusCode = s.status?.code || s.status;
                         // Container number and ETA only exist once goods are

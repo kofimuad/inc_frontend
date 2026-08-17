@@ -42,7 +42,18 @@ export interface ContainerItem {
 
 export interface ContainerSearchResult {
     containers: ContainerLoading[];
-    waybillMatch: { item: ContainerItem; container: ContainerLoading } | null;
+    /**
+     * A tracking number shared by several customers has no single shipment
+     * behind it, so `item` is null unless the caller identified themselves with
+     * a phone or shipping mark. The container is still returned — it is common
+     * to everyone on the number and reveals nothing about any one customer.
+     */
+    waybillMatch: {
+        item: ContainerItem | null;
+        container: ContainerLoading;
+        sharedBy: number;
+        ambiguous: boolean;
+    } | null;
 }
 
 export async function listContainerLoadings(params?: { page?: number; limit?: number; status?: string }) {
@@ -50,8 +61,19 @@ export async function listContainerLoadings(params?: { page?: number; limit?: nu
     return data.data as { containers: ContainerLoading[]; pagination: any };
 }
 
-export async function searchContainerLoadings(q: string) {
-    const { data } = await publicApi.get("/api/container-loadings/search", { params: { q } });
+/**
+ * Pass the customer's phone or shipping mark when they gave one — without it a
+ * tracking number covering several customers resolves to no shipment at all.
+ */
+export async function searchContainerLoadings(
+    q: string,
+    identifier?: { phone?: string; mark?: string },
+) {
+    const params: Record<string, string> = { q };
+    if (identifier?.phone) params.phone = identifier.phone;
+    if (identifier?.mark) params.mark = identifier.mark;
+
+    const { data } = await publicApi.get("/api/container-loadings/search", { params });
     return data.data as ContainerSearchResult;
 }
 

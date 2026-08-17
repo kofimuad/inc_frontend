@@ -123,23 +123,51 @@ function ContainerCard({ container }: { container: ContainerLoading }) {
 
 // ─── Tracking number match result card ────────────────────────────────────────
 
-function TrackingMatchCard({ item, container }: { item: any; container: ContainerLoading }) {
+/**
+ * `item` is null when the tracking number covers several customers — the goods
+ * on it belong to different people, so there is no one shipment to describe
+ * without knowing who is asking. The container is still shown: it is the same
+ * for all of them.
+ */
+function TrackingMatchCard({
+    item,
+    container,
+    trackingNumber,
+    sharedBy,
+}: {
+    item: any | null;
+    container: ContainerLoading;
+    trackingNumber: string;
+    sharedBy: number;
+}) {
     return (
         <div className="bg-[#039B81]/5 border-2 border-[#039B81]/20 rounded-3xl p-6 mb-6">
             <p className="text-[10px] font-black text-[#039B81] uppercase tracking-widest mb-3">Tracking Number Found</p>
             <div className="flex flex-wrap items-center gap-4 mb-4">
                 <div>
                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Tracking Number</p>
-                    <p className="font-black text-slate-800 text-lg">{item.waybillNo}</p>
+                    <p className="font-black text-slate-800 text-lg">{item?.waybillNo || trackingNumber}</p>
                 </div>
-                {item.destinationCity && (
+                {item?.destinationCity && (
                     <div>
                         <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Destination</p>
                         <p className="font-bold text-slate-700">{item.destinationCity}</p>
                     </div>
                 )}
-                <ItemStatusBadge status={item.status} />
+                {item && <ItemStatusBadge status={item.status} />}
             </div>
+            {!item && (
+                <p className="mb-4 text-xs font-medium text-slate-500 bg-white/70 border border-[#039B81]/10 rounded-xl px-4 py-3">
+                    {sharedBy > 1
+                        ? `This tracking number covers ${sharedBy} customers' goods.`
+                        : "This tracking number covers more than one shipment."}{" "}
+                    Its container is shown below —{" "}
+                    <a href={`/tracking?q=${encodeURIComponent(trackingNumber)}`} className="text-[#039B81] font-black hover:underline">
+                        track it with your phone number or shipping mark
+                    </a>{" "}
+                    to see your own shipment.
+                </p>
+            )}
             <div className="border-t border-[#039B81]/10 pt-4">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Container</p>
                 <div className="flex flex-wrap items-center gap-3">
@@ -166,7 +194,11 @@ function ContainerLoadingsContent() {
 
     const [searchValue, setSearchValue]   = useState(initialQ);
     const [containers, setContainers]     = useState<ContainerLoading[]>([]);
-    const [waybillMatch, setWaybillMatch] = useState<{ item: any; container: ContainerLoading } | null>(null);
+    const [waybillMatch, setWaybillMatch] = useState<{
+        item: any | null;
+        container: ContainerLoading;
+        sharedBy?: number;
+    } | null>(null);
     const [isLoading, setIsLoading]       = useState(true);
     const [isSearching, setIsSearching]   = useState(false);
     const [error, setError]               = useState<string | null>(null);
@@ -298,7 +330,12 @@ function ContainerLoadingsContent() {
                     ) : (
                         <>
                             {waybillMatch && (
-                                <TrackingMatchCard item={waybillMatch.item} container={waybillMatch.container} />
+                                <TrackingMatchCard
+                                    item={waybillMatch.item}
+                                    container={waybillMatch.container}
+                                    trackingNumber={searchValue.trim().toUpperCase()}
+                                    sharedBy={waybillMatch.sharedBy ?? 0}
+                                />
                             )}
 
                             {containers.length === 0 && !waybillMatch ? (
