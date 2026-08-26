@@ -350,7 +350,11 @@ function LoginForm() {
     const [tab, setTab] = useState<"email" | "phone">("phone");
     // Set by ProtectedRoute when a session ends on its own. Without it the user
     // was bounced to this page with no idea why their dashboard had emptied.
-    const wasExpired = useSearchParams().get("expired") === "1";
+    // "1" is the original marker and still works; the reason is carried through
+    // now so the message can be specific about what happened.
+    const expiredParam = useSearchParams().get("expired");
+    const wasExpired = !!expiredParam;
+    const wasIdle = expiredParam === "idle_timeout";
 
     return (
         <div className="flex-grow flex flex-col justify-center max-w-md w-full mx-auto">
@@ -363,10 +367,13 @@ function LoginForm() {
                 <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
                     <Clock size={18} className="text-amber-500 shrink-0 mt-0.5" />
                     <div>
-                        <p className="text-sm font-black text-amber-800">Your session timed out</p>
+                        <p className="text-sm font-black text-amber-800">
+                            {wasIdle ? "Your session timed out" : "You were signed out"}
+                        </p>
                         <p className="text-xs text-amber-700 font-medium mt-0.5">
-                            You were signed out after a period of inactivity. Sign in again and
-                            your data will be right where you left it.
+                            {wasIdle
+                                ? "You were signed out after 30 minutes of inactivity, to keep shipment data safe on shared computers. Sign in again and your data will be right where you left it."
+                                : "Your session ended. Sign in again and your data will be right where you left it."}
                         </p>
                     </div>
                 </div>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Ubuntu } from "next/font/google";
 import { AuthProvider } from "@/context/AuthContext";
+import SessionTimeoutGuard from "@/components/common/SessionTimeoutGuard";
 import "./globals.css";
 
 const ubuntu = Ubuntu({
@@ -24,6 +25,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${ubuntu.variable} ${ubuntu.className} antialiased`} suppressHydrationWarning={true}>
         <AuthProvider>
+            {/* Mounted here rather than inside AuthProvider so the provider does
+                not import a component that consumes its own context. */}
+            <SessionTimeoutGuard />
             {children}
         </AuthProvider>
       </body>

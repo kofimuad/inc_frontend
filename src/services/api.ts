@@ -12,10 +12,16 @@ const setStoredToken = (token: string | null): void => {
     if (typeof window === 'undefined') return;
     if (token) {
         localStorage.setItem(ACCESS_TOKEN_KEY, token);
+        hasHadSession = true;
     } else {
         localStorage.removeItem(ACCESS_TOKEN_KEY);
     }
 };
+
+// Whether this browser has ever held a session. A first-time visitor's refresh
+// attempt fails exactly like an expired one, and announcing that as "your
+// session timed out" to someone who never signed in is just confusing.
+let hasHadSession = typeof window !== 'undefined' && !!localStorage.getItem(ACCESS_TOKEN_KEY);
 
 export const setAccessToken = (token: string | null) => {
     setStoredToken(token);
@@ -51,7 +57,9 @@ function isTokenExpiredOrExpiringSoon(token: string, bufferSeconds = 60): boolea
 // held a user, so protected pages kept rendering, every request 401'd, and the
 // dashboard sat empty with nothing explaining why.
 
-type SessionExpiredHandler = () => void;
+export type SessionEndReason = 'idle_timeout' | 'expired';
+
+type SessionExpiredHandler = (reason: SessionEndReason) => void;
 const sessionExpiredHandlers = new Set<SessionExpiredHandler>();
 
 /** Subscribe to session expiry. Returns an unsubscribe function. */
@@ -60,21 +68,56 @@ export const onSessionExpired = (handler: SessionExpiredHandler): (() => void) =
     return () => { sessionExpiredHandlers.delete(handler); };
 };
 
+// The refresh endpoint refused the session: it is genuinely over and the user
+// has to sign in again.
+export class SessionEndedError extends Error {
+    reason: SessionEndReason;
+    constructor(reason: SessionEndReason) {
+        super('Session ended');
+        this.name = 'SessionEndedError';
+        this.reason = reason;
+    }
+}
+
+// The refresh could not be completed for a reason that says nothing about the
+// session — throttled, offline, server error. Signing the user out here is the
+// bug that made a rate-limited office look like a room full of expired
+// sessions, so these are kept strictly apart.
+export class RefreshUnavailableError extends Error {
+    constructor() {
+        super('Refresh unavailable');
+        this.name = 'RefreshUnavailableError';
+    }
+}
+
 // Guards against a burst of in-flight requests each announcing the same expiry
 // and each retrying the dead refresh endpoint.
 let sessionIsOver = false;
 
-const notifySessionExpired = () => {
+const notifySessionExpired = (reason: SessionEndReason = 'expired') => {
     if (sessionIsOver) return;
+    // Never announce an expiry to someone who was never signed in.
+    if (!hasHadSession) return;
     sessionIsOver = true;
     setStoredToken(null);
     sessionExpiredHandlers.forEach((handler) => {
-        try { handler(); } catch { /* a bad subscriber must not break the rest */ }
+        try { handler(reason); } catch { /* a bad subscriber must not break the rest */ }
     });
 };
 
+/** Announce an expiry decided by the client (the idle timeout) or another tab. */
+export const endSession = (reason: SessionEndReason = 'expired') => notifySessionExpired(reason);
+
 /** Called after a successful login so the next expiry is announced again. */
 export const resetSessionExpiry = () => { sessionIsOver = false; };
+
+/** Milliseconds until the stored access token expires, or null if there is none. */
+export const getAccessTokenTimeToExpiry = (): number | null => {
+    const token = getStoredToken();
+    if (!token) return null;
+    const exp = getTokenExpiry(token);
+    return exp === null ? null : exp * 1000 - Date.now();
+};
 
 const api = axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -102,18 +145,44 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 async function doRefresh(): Promise<string> {
-    const response = await axios.post(
-        `${api.defaults.baseURL}/api/auth/refresh`,
-        {},
-        { withCredentials: true }
-    );
+    let response;
+    try {
+        response = await axios.post(
+            `${api.defaults.baseURL}/api/auth/refresh`,
+            {},
+            { withCredentials: true }
+        );
+    } catch (err) {
+        const status = (err as AxiosError).response?.status;
+        // Only the server actually refusing the refresh token means the session
+        // is over. A 429, a 5xx or no response at all says nothing about it.
+        if (status === 401 || status === 403) {
+            const body = (err as AxiosError<{ data?: { reason?: string } }>).response?.data;
+            throw new SessionEndedError(
+                body?.data?.reason === 'idle_timeout' ? 'idle_timeout' : 'expired'
+            );
+        }
+        throw new RefreshUnavailableError();
+    }
     const newToken = response.data?.data?.accessToken || response.data?.accessToken;
-    if (!newToken) throw new Error("No token received from refresh endpoint");
+    if (!newToken) throw new SessionEndedError('expired');
     setAccessToken(newToken);
     // A refresh that succeeds means the session is alive again.
     sessionIsOver = false;
     return newToken;
 }
+
+/**
+ * Refresh on demand — used by "Stay signed in" and by the idle guard to keep a
+ * genuinely-active session alive. Rethrows so the caller can react.
+ */
+export const forceRefresh = (): Promise<string> => doRefresh();
+
+// A refresh that failed for a transient reason must not sign anyone out; one the
+// server refused must. Both interceptors funnel through here so they agree.
+const handleRefreshFailure = (err: unknown) => {
+    if (err instanceof SessionEndedError) notifySessionExpired(err.reason);
+};
 
 // Request interceptor — proactively refresh if the token is expired/expiring soon
 // so requests never hit the server with a stale token.
@@ -142,9 +211,11 @@ api.interceptors.request.use(
                         // endpoints (tracking, container lookups) share this client
                         // and must keep working for a signed-out visitor. What
                         // changes is that the app is now told the session is over,
-                        // so protected pages stop rendering an empty shell.
+                        // so protected pages stop rendering an empty shell — but
+                        // only when the server actually refused the session, not
+                        // when the refresh was merely throttled or unreachable.
                         processQueue(null, null);
-                        notifySessionExpired();
+                        handleRefreshFailure(err);
                         token = null;
                     } finally {
                         isRefreshing = false;
@@ -211,7 +282,7 @@ api.interceptors.response.use(
                 return api(originalRequest);
             } catch (refreshError) {
                 processQueue(null, null);
-                notifySessionExpired();
+                handleRefreshFailure(refreshError);
                 // Reject with the original 401 error so callers see the real failure
                 return Promise.reject(error);
             } finally {

@@ -5,6 +5,25 @@
 
 export const ACCESS_TOKEN_KEY = 'access_token';
 
+// ─── Session timeout ──────────────────────────────────────────────────────────
+//
+// Staff dashboards hold other people's shipment data on shared back-office
+// machines, so a staff session lapses after a spell of no use. Customers are
+// left alone — they see only their own parcels, and signing them out mid-visit
+// is friction with nothing to show for it.
+//
+// Keep SESSION_IDLE_MS in step with STAFF_IDLE_TIMEOUT_MINUTES on the backend,
+// which enforces the same window against the refresh token. The client warns
+// and signs out; the server is what actually makes it stick.
+export const SESSION_IDLE_MS = 30 * 60 * 1000;   // 30 minutes of no activity
+export const SESSION_WARN_MS = 2 * 60 * 1000;    // warn for the last 2 minutes
+export const SESSION_IDLE_ROLES = ['admin', 'employee'] as const;
+
+// Shared through localStorage so every open tab agrees on one clock: working in
+// one tab keeps the others alive, and signing out in one signs out all of them.
+export const LAST_ACTIVITY_KEY = 'session_last_activity';
+export const SESSION_ENDED_KEY = 'session_ended_at';
+
 export const SHIPMENT_STATUSES = {
     // Traditional flow
     PENDING: 'pending',
