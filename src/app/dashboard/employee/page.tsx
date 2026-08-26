@@ -33,6 +33,10 @@ export default function EmployeeDashboard() {
     const [containers, setContainers] = useState<ContainerLoading[]>([]);
     const [batchGroups, setBatchGroups] = useState<BatchSummary[]>([]);
     const [groupsLoading, setGroupsLoading] = useState(true);
+    // A failed load used to fall through to an empty list, so a throttled or
+    // expired session was indistinguishable from "there is nothing here" — and
+    // staff looking for an upload to retract concluded it had vanished.
+    const [groupsError, setGroupsError] = useState<string | null>(null);
     // Bumped after an item edit/delete so an open card reloads its items.
     const [itemsRefreshKey, setItemsRefreshKey] = useState(0);
 
@@ -72,6 +76,7 @@ export default function EmployeeDashboard() {
     // Fetch the card groups (batches or containers) for the active tab.
     const fetchGroups = useCallback(async () => {
         setGroupsLoading(true);
+        setGroupsError(null);
         try {
             const search = debouncedSearchQuery || undefined;
             if (activeList === 'container_loadings') {
@@ -82,7 +87,11 @@ export default function EmployeeDashboard() {
                 const r = await getBatches({ stage, limit: 50, search });
                 setBatchGroups(r.batches);
             }
-        } catch {
+        } catch (err: any) {
+            setGroupsError(
+                err?.response?.data?.message ||
+                "Couldn't load this list. Check your connection and try again."
+            );
             setContainers([]);
             setBatchGroups([]);
         } finally {
@@ -299,6 +308,17 @@ export default function EmployeeDashboard() {
                             {groupsLoading ? (
                                 <div className="bg-white rounded-2xl border border-slate-100 py-16 flex justify-center text-slate-400 font-medium tracking-widest text-sm uppercase">
                                     Loading…
+                                </div>
+                            ) : groupsError ? (
+                                <div className="bg-white rounded-2xl border border-red-100 py-10 px-6 text-center">
+                                    <AlertTriangle size={20} className="text-red-500 mx-auto mb-3" />
+                                    <p className="text-xs text-red-600 font-bold leading-relaxed">{groupsError}</p>
+                                    <button
+                                        onClick={fetchGroups}
+                                        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-slate-200 text-[10px] font-black text-slate-500 hover:text-[#039B81] uppercase tracking-widest transition-colors"
+                                    >
+                                        <RefreshCw size={12} /> Try again
+                                    </button>
                                 </div>
                             ) : activeList === 'container_loadings' ? (
                                 containers.length === 0 ? (

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Info, ClipboardList, Undo2, History, RefreshCw } from "lucide-react";
 import Button from "@/components/common/Button";
+import { useDebounce } from "@/hooks/useDebounce";
 import { uploadBatchShipped, uploadBatchArrived, uploadBatchIntake, retractBatch, getBatches, BatchSummary } from "@/services/shipments";
 
 interface BulkUploadModalProps {
@@ -29,6 +30,13 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
     const [isDuplicate, setIsDuplicate] = useState(false);
     const [duplicateBatchId, setDuplicateBatchId] = useState<string | null>(null);
     const [isReplacing, setIsReplacing] = useState(false);
+    // Why the replace failed, kept apart from `error` so the duplicate notice
+    // above it stays readable. Without this the failure overwrote the "already
+    // uploaded" text inside an otherwise identical panel, so the button looked
+    // like it had done nothing at all.
+    const [replaceError, setReplaceError] = useState<string | null>(null);
+    const [replaceCanForce, setReplaceCanForce] = useState(false);
+    const [confirmForceReplace, setConfirmForceReplace] = useState(false);
 
     // Retraction (undo a wrong upload)
     const [batchId, setBatchId] = useState<string | null>(null);
@@ -46,6 +54,9 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
             setBatchId(null);
             setConfirmRetract(false);
             setRetractedMsg(null);
+            setReplaceError(null);
+            setReplaceCanForce(false);
+            setConfirmForceReplace(false);
         }
     };
 
@@ -56,6 +67,9 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
         setError(null);
         setIsDuplicate(false);
         setDuplicateBatchId(null);
+        setReplaceError(null);
+        setReplaceCanForce(false);
+        setConfirmForceReplace(false);
         try {
             let data;
             if (stage === 'intake') {
@@ -103,24 +117,39 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
     };
 
     // Duplicate upload → delete the previous batch, then retry with the same file.
-    const handleReplaceAndRetry = async () => {
+    // The retract can legitimately refuse when items from the old batch have
+    // since moved on (very common for an old packing list, whose goods were
+    // delivered months ago). The server flags those refusals as overridable, so
+    // offer the force option here rather than leaving staff on a dead button.
+    const runReplace = async (force: boolean) => {
         if (!duplicateBatchId) return;
         setIsReplacing(true);
-        setError(null);
+        setReplaceError(null);
         try {
-            await retractBatch(duplicateBatchId);
+            await retractBatch(duplicateBatchId, force);
             onSuccess();
             setIsDuplicate(false);
             setDuplicateBatchId(null);
+            setReplaceCanForce(false);
+            setConfirmForceReplace(false);
             await handleUpload();
         } catch (err: any) {
-            setError(
+            const message =
                 err?.response?.data?.message ||
-                "Couldn't delete the previous upload. It may have items that already moved to a later stage — retract that stage first."
-            );
+                "Couldn't delete the previous upload. Please try again.";
+            setReplaceError(message);
+            setReplaceCanForce(!force && err?.response?.status === 409 && !!err?.response?.data?.data?.canForce);
+            setConfirmForceReplace(false);
         } finally {
             setIsReplacing(false);
         }
+    };
+
+    const handleReplaceAndRetry = () => runReplace(false);
+
+    const handleForceReplace = () => {
+        if (!confirmForceReplace) { setConfirmForceReplace(true); return; }
+        runReplace(true);
     };
 
     const handleRetract = async () => {
@@ -195,7 +224,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                             ].map((s) => (
                                 <button
                                     key={s.id}
-                                    onClick={() => { setStage(s.id as Stage); setFile(null); setResult(null); setError(null); setIsDuplicate(false); setBatchId(null); setConfirmRetract(false); setRetractedMsg(null); setAutoHold(false); }}
+                                    onClick={() => { setStage(s.id as Stage); setFile(null); setResult(null); setError(null); setIsDuplicate(false); setBatchId(null); setConfirmRetract(false); setRetractedMsg(null); setAutoHold(false); setReplaceError(null); setReplaceCanForce(false); setConfirmForceReplace(false); }}
                                     className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-1 ${
                                         stage === s.id
                                         ? "border-[#039B81] bg-[#039B81]/5 text-[#039B81]"
@@ -385,6 +414,38 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                                                 <History size={14} /> Manage Uploads
                                             </button>
                                         </div>
+                                        {replaceError && (
+                                            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl">
+                                                <p className="text-[10px] font-black text-red-700 uppercase tracking-widest mb-1">Previous upload was not deleted</p>
+                                                <p className="text-[11px] text-red-700 font-bold leading-snug">{replaceError}</p>
+                                                {replaceCanForce && (
+                                                    <div className="mt-2">
+                                                        <button
+                                                            onClick={handleForceReplace}
+                                                            disabled={isReplacing || isLoading}
+                                                            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 ${
+                                                                confirmForceReplace
+                                                                ? "bg-red-700 text-white hover:bg-red-800"
+                                                                : "bg-white text-red-600 border border-red-300 hover:bg-red-50"
+                                                            }`}
+                                                        >
+                                                            <AlertCircle size={13} />
+                                                            {isReplacing
+                                                                ? "Forcing…"
+                                                                : confirmForceReplace
+                                                                ? "Confirm force — delete anyway & upload"
+                                                                : "Force delete previous & upload this"}
+                                                        </button>
+                                                        {confirmForceReplace && (
+                                                            <p className="text-[10px] text-red-600 font-bold mt-1.5 leading-snug">
+                                                                The previous upload is reversed even though some of its items already moved forward —
+                                                                those items are reset too. Then this file is processed.
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                         <p className="text-[10px] text-amber-600 mt-2 leading-snug">
                                             If it says a later <span className="uppercase font-black">Arrived</span> upload must be retracted first,
                                             open <span className="font-black">Manage Uploads</span> and retract that one before this.
@@ -445,19 +506,35 @@ function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
     const [confirmId, setConfirmId] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<{ id: string; ok: boolean; msg: string; canForce?: boolean } | null>(null);
     const [forceConfirmId, setForceConfirmId] = useState<string | null>(null);
+    // An old packing list is rarely among the 25 most recent uploads, so the
+    // list needs a way to reach further back than "newest first".
+    const [stageFilter, setStageFilter] = useState<'all' | Stage>('all');
+    const [search, setSearch] = useState("");
+    const debouncedSearch = useDebounce(search, 400);
 
     const load = useCallback(async () => {
         setLoading(true);
         setLoadError(null);
         try {
-            const data = await getBatches({ limit: 25 });
+            const data = await getBatches({
+                limit: 50,
+                ...(stageFilter !== 'all' ? { stage: stageFilter } : {}),
+                ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
+            });
             setBatches(data?.batches ?? []);
-        } catch {
-            setLoadError("Couldn't load recent uploads. Please try again.");
+        } catch (err: any) {
+            // Show what the server actually said. Swallowing it here meant a
+            // throttled or expired session looked identical to "there is
+            // genuinely nothing to retract", which is the opposite advice.
+            setLoadError(
+                err?.response?.data?.message ||
+                "Couldn't load recent uploads. Please try again."
+            );
+            setBatches([]);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [stageFilter, debouncedSearch]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -473,8 +550,10 @@ function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
             await load();
         } catch (err: any) {
             const msg = err?.response?.data?.message || "Couldn't retract this upload.";
-            // A 409 from the progressed-item guard is the only case force can override.
-            const canForce = !force && err?.response?.status === 409 && /cannot retract/i.test(msg);
+            // The server flags which 409s the force flag can override. Reading the
+            // flag rather than pattern-matching the message means a reworded
+            // message never silently hides the override.
+            const canForce = !force && err?.response?.status === 409 && !!err?.response?.data?.data?.canForce;
             setFeedback({ id, ok: false, msg, canForce });
             setConfirmId(null);
         } finally {
@@ -501,6 +580,35 @@ function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
                 </button>
             </div>
 
+            <div className="space-y-2">
+                <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search by batch code (e.g. PKL-2025-004, CTR-MSBU8308501)"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 placeholder:text-slate-300 placeholder:font-medium focus:outline-none focus:border-[#039B81]"
+                />
+                <div className="flex gap-2">
+                    {([
+                        { id: 'all',     label: 'All' },
+                        { id: 'intake',  label: 'Intake' },
+                        { id: 'shipped', label: 'Packing' },
+                        { id: 'arrived', label: 'Arrived' },
+                    ] as const).map((f) => (
+                        <button
+                            key={f.id}
+                            onClick={() => setStageFilter(f.id)}
+                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                                stageFilter === f.id
+                                ? "bg-[#039B81]/10 text-[#039B81]"
+                                : "bg-slate-100 text-slate-400 hover:bg-slate-200"
+                            }`}
+                        >
+                            {f.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex gap-2">
                 <Info size={14} className="text-amber-500 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-amber-800 font-bold leading-snug">
@@ -514,7 +622,11 @@ function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
             ) : loadError ? (
                 <p className="text-xs text-red-600 font-bold py-8 text-center">{loadError}</p>
             ) : batches.length === 0 ? (
-                <p className="text-xs text-slate-400 font-bold py-8 text-center">No uploads yet.</p>
+                <p className="text-xs text-slate-400 font-bold py-8 text-center">
+                    {debouncedSearch.trim() || stageFilter !== 'all'
+                        ? "No uploads match this search. Try clearing the filter."
+                        : "No uploads yet."}
+                </p>
             ) : (
                 <div className="space-y-2">
                     {batches.map((b) => {
