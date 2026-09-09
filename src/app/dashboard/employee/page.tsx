@@ -32,6 +32,11 @@ export default function EmployeeDashboard() {
     // Card groups for the active tab.
     const [containers, setContainers] = useState<ContainerLoading[]>([]);
     const [batchGroups, setBatchGroups] = useState<BatchSummary[]>([]);
+    // Goods Received only: how many of each intake batch's items are still
+    // in_warehouse/held (the rest were loaded onto a packing list and are no
+    // longer shown as items inside the card, but the card total still counts
+    // them — this fills that gap in so staff don't think rows vanished).
+    const [remainingCounts, setRemainingCounts] = useState<Record<string, number>>({});
     const [groupsLoading, setGroupsLoading] = useState(true);
     // A failed load used to fall through to an empty list, so a throttled or
     // expired session was indistinguishable from "there is nothing here" — and
@@ -86,6 +91,25 @@ export default function EmployeeDashboard() {
                 const stage = activeList === 'goods_received' ? 'intake' : 'arrived';
                 const r = await getBatches({ stage, limit: 50, search });
                 setBatchGroups(r.batches);
+
+                // Loaded customers are hidden from a Goods Received card's item
+                // list (status filter below), so surface how many of each
+                // batch's items are still in the warehouse alongside the total.
+                if (activeList === 'goods_received') {
+                    const entries = await Promise.all(
+                        r.batches.map(async (b) => {
+                            try {
+                                const items = await fetchBatchItems(b._id, { status: 'in_warehouse,held', limit: 1 });
+                                return [b._id, items?.pagination?.total ?? 0] as const;
+                            } catch {
+                                return [b._id, b.totalItems ?? 0] as const;
+                            }
+                        })
+                    );
+                    setRemainingCounts(Object.fromEntries(entries));
+                } else {
+                    setRemainingCounts({});
+                }
             }
         } catch (err: any) {
             setGroupsError(
@@ -374,11 +398,19 @@ export default function EmployeeDashboard() {
                                                 meta={[
                                                     ...(b.createdAt ? [{ label: "Uploaded", value: new Date(b.createdAt).toLocaleDateString("en-GB") }] : []),
                                                     ...((b.heldItems ?? 0) > 0 ? [{ label: "Held", value: String(b.heldItems) }] : []),
+                                                    // Loaded items no longer show in this card's list — this makes clear
+                                                    // the batch is partly loaded rather than looking like rows vanished.
+                                                    ...(activeList === 'goods_received' && remainingCounts[b._id] !== undefined && remainingCounts[b._id] < (b.totalItems ?? 0)
+                                                        ? [{ label: "In warehouse", value: `${remainingCounts[b._id]} of ${b.totalItems ?? 0}` }]
+                                                        : []),
                                                 ]}
                                                 onEdit={() => setEditingBatch(b)}
                                                 onDelete={() => handleDeleteBatch(b)}
                                                 deleting={deletingBatchId === b._id}
-                                                loadItems={async () => (await fetchBatchItems(b._id)).items}
+                                                loadItems={async () => (await fetchBatchItems(
+                                                    b._id,
+                                                    activeList === 'goods_received' ? { status: 'in_warehouse,held' } : {}
+                                                )).items}
                                                 onEditItem={setEditingItem}
                                                 onDeleteItem={handleDeleteItem}
                                                 statusColor={getStatusColor}

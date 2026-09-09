@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { X, Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Info, ClipboardList, Undo2, History, RefreshCw } from "lucide-react";
 import Button from "@/components/common/Button";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -25,6 +25,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
         added?: number;
         held?: number;
         skipped: number;
+        leftovers?: { count: number; sample: { waybillNo: string; customerName?: string; customerKey?: string }[] };
     } | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isDuplicate, setIsDuplicate] = useState(false);
@@ -37,6 +38,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
     const [replaceError, setReplaceError] = useState<string | null>(null);
     const [replaceCanForce, setReplaceCanForce] = useState(false);
     const [confirmForceReplace, setConfirmForceReplace] = useState(false);
+    const replaceErrorRef = useRef<HTMLDivElement | null>(null);
 
     // Retraction (undo a wrong upload)
     const [batchId, setBatchId] = useState<string | null>(null);
@@ -83,10 +85,11 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
             const batch = data?.batch;
             setBatchId(batch?._id ?? null);
             setResult({
-                updated: batch?.matchedItems ?? 0,
-                added:   batch?.newItems,
-                held:    batch?.heldItems,
-                skipped: data?.skippedRows?.length ?? 0,
+                updated:   batch?.matchedItems ?? 0,
+                added:     batch?.newItems,
+                held:      batch?.heldItems,
+                skipped:   data?.skippedRows?.length ?? 0,
+                leftovers: data?.leftovers,
             });
             onSuccess();
         } catch (err: any) {
@@ -122,7 +125,18 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
     // delivered months ago). The server flags those refusals as overridable, so
     // offer the force option here rather than leaving staff on a dead button.
     const runReplace = async (force: boolean) => {
-        if (!duplicateBatchId) return;
+        if (!duplicateBatchId) {
+            // The server's 409 response didn't identify the previous upload
+            // (older deployment, or the batch was already deleted elsewhere),
+            // so there's nothing here to retract. Point staff at the one
+            // place that can still find and delete it, instead of the button
+            // silently doing nothing.
+            setReplaceError(
+                "Couldn't identify the previous upload to delete automatically. " +
+                "Open Manage Uploads and retract it from there, then upload this file again."
+            );
+            return;
+        }
         setIsReplacing(true);
         setReplaceError(null);
         try {
@@ -144,6 +158,13 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
             setIsReplacing(false);
         }
     };
+
+    // The replace-failure block renders below the trigger button; without this
+    // it could sit out of view and a click on "Delete previous & upload"
+    // looked like it did nothing.
+    useEffect(() => {
+        if (replaceError) replaceErrorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }, [replaceError]);
 
     const handleReplaceAndRetry = () => runReplace(false);
 
@@ -212,7 +233,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                 {view === 'manage' ? (
                     <RecentUploadsPanel onChanged={onSuccess} />
                 ) : (
-                <div className="p-8 space-y-8">
+                <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto">
                     {/* Stage Selection */}
                     <div>
                         <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Select Upload Stage</label>
@@ -348,6 +369,30 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                                     <span className="text-[#039B81] font-black">Edit</span> button in the shipments table to fill in any empty fields.
                                 </p>
                             </div>
+                            {/* Goods-received parcels this packing list didn't claim — informational
+                                only, nothing is changed automatically. */}
+                            {result.leftovers && result.leftovers.count > 0 && (
+                                <div className="mt-4 p-4 bg-orange-50 border border-orange-100 rounded-2xl text-left">
+                                    <p className="text-[10px] font-black text-orange-700 uppercase tracking-widest mb-1">
+                                        {result.leftovers.count} goods-received parcel{result.leftovers.count === 1 ? "" : "s"} not on this packing list
+                                    </p>
+                                    <p className="text-[11px] text-orange-700 font-bold leading-snug mb-2">
+                                        From recent intakes, still marked in-warehouse. Nothing was changed — review these and hold, delete, or re-check the sheet if they should have been included.
+                                    </p>
+                                    <ul className="text-[11px] text-orange-800 space-y-0.5">
+                                        {result.leftovers.sample.slice(0, 8).map((l, i) => (
+                                            <li key={`${l.waybillNo}-${i}`} className="truncate">
+                                                {l.waybillNo}{l.customerName ? ` — ${l.customerName}` : ""}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    {result.leftovers.count > result.leftovers.sample.length && (
+                                        <p className="text-[10px] text-orange-600 mt-1">
+                                            +{result.leftovers.count - result.leftovers.sample.length} more
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                             {/* Retract (undo) a wrong upload */}
                             {batchId && (
                                 <div className="mt-4 pt-4 border-t border-emerald-100">
@@ -415,7 +460,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: BulkUplo
                                             </button>
                                         </div>
                                         {replaceError && (
-                                            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl">
+                                            <div ref={replaceErrorRef} className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl">
                                                 <p className="text-[10px] font-black text-red-700 uppercase tracking-widest mb-1">Previous upload was not deleted</p>
                                                 <p className="text-[11px] text-red-700 font-bold leading-snug">{replaceError}</p>
                                                 {replaceCanForce && (
@@ -498,30 +543,40 @@ const STAGE_META: Record<string, { label: string; cls: string }> = {
     arrived: { label: "Arrived", cls: "bg-purple-50 text-purple-700" },
 };
 
+const UPLOADS_PAGE_SIZE = 50;
+
 function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
     const [batches, setBatches] = useState<BatchSummary[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [busyId, setBusyId] = useState<string | null>(null);
     const [confirmId, setConfirmId] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<{ id: string; ok: boolean; msg: string; canForce?: boolean } | null>(null);
     const [forceConfirmId, setForceConfirmId] = useState<string | null>(null);
-    // An old packing list is rarely among the 25 most recent uploads, so the
-    // list needs a way to reach further back than "newest first".
+    // An old packing list is rarely among the newest uploads, so the list
+    // needs a way to reach further back than "newest first" — filtering,
+    // searching, and paging past the first page.
     const [stageFilter, setStageFilter] = useState<'all' | Stage>('all');
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebounce(search, 400);
+    const [page, setPage] = useState(1);
+    const [pagination, setPagination] = useState<{ total: number; pages: number } | null>(null);
 
-    const load = useCallback(async () => {
-        setLoading(true);
+    const load = useCallback(async (targetPage: number, append: boolean) => {
+        if (append) setLoadingMore(true); else setLoading(true);
         setLoadError(null);
         try {
             const data = await getBatches({
-                limit: 50,
+                page:  targetPage,
+                limit: UPLOADS_PAGE_SIZE,
                 ...(stageFilter !== 'all' ? { stage: stageFilter } : {}),
                 ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
             });
-            setBatches(data?.batches ?? []);
+            const rows = data?.batches ?? [];
+            setBatches((prev) => (append ? [...prev, ...rows] : rows));
+            setPagination(data?.pagination ? { total: data.pagination.total, pages: data.pagination.pages } : null);
+            setPage(targetPage);
         } catch (err: any) {
             // Show what the server actually said. Swallowing it here meant a
             // throttled or expired session looked identical to "there is
@@ -530,13 +585,19 @@ function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
                 err?.response?.data?.message ||
                 "Couldn't load recent uploads. Please try again."
             );
-            setBatches([]);
+            if (!append) setBatches([]);
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
     }, [stageFilter, debouncedSearch]);
 
-    useEffect(() => { load(); }, [load]);
+    // Reset to page 1 whenever the filter or search changes.
+    useEffect(() => { load(1, false); }, [load]);
+
+    const loadMore = () => {
+        if (pagination && page < pagination.pages) load(page + 1, true);
+    };
 
     const runRetract = async (id: string, force: boolean) => {
         setBusyId(id);
@@ -547,7 +608,7 @@ function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
             setConfirmId(null);
             setForceConfirmId(null);
             onChanged();
-            await load();
+            await load(1, false);
         } catch (err: any) {
             const msg = err?.response?.data?.message || "Couldn't retract this upload.";
             // The server flags which 409s the force flag can override. Reading the
@@ -574,8 +635,15 @@ function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
     return (
         <div className="p-8 space-y-4 max-h-[60vh] overflow-y-auto">
             <div className="flex items-center justify-between">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Recent Uploads</p>
-                <button onClick={load} className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-[#039B81] uppercase tracking-widest transition-colors">
+                <div>
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Recent Uploads</p>
+                    {pagination && !loading && (
+                        <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+                            Showing {batches.length} of {pagination.total}
+                        </p>
+                    )}
+                </div>
+                <button onClick={() => load(1, false)} className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-[#039B81] uppercase tracking-widest transition-colors">
                     <RefreshCw size={12} /> Refresh
                 </button>
             </div>
@@ -584,7 +652,7 @@ function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
                 <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search by batch code (e.g. PKL-2025-004, CTR-MSBU8308501)"
+                    placeholder="Search by filename, batch code, container no., or notes"
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 placeholder:text-slate-300 placeholder:font-medium focus:outline-none focus:border-[#039B81]"
                 />
                 <div className="flex gap-2">
@@ -640,6 +708,9 @@ function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
                                             <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${meta.cls}`}>{meta.label}</span>
                                             <span className="text-xs font-black text-slate-800 truncate">{b.batchCode}</span>
                                         </div>
+                                        {b.sourceFilename && (
+                                            <p className="text-[10px] text-slate-500 font-bold truncate mt-0.5">{b.sourceFilename}</p>
+                                        )}
                                         <p className="text-[10px] text-slate-400 font-bold mt-1">
                                             {b.totalItems ?? 0} items{b.heldItems ? ` · ${b.heldItems} held` : ""}
                                             {b.createdAt ? ` · ${new Date(b.createdAt).toLocaleDateString()}` : ""}
@@ -694,6 +765,20 @@ function RecentUploadsPanel({ onChanged }: { onChanged: () => void }) {
                             </div>
                         );
                     })}
+                    {pagination && page < pagination.pages && (
+                        <div className="flex justify-center pt-2">
+                            <button
+                                onClick={loadMore}
+                                disabled={loadingMore}
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all disabled:opacity-50"
+                            >
+                                {loadingMore ? (
+                                    <RefreshCw size={12} className="animate-spin" />
+                                ) : null}
+                                {loadingMore ? "Loading…" : "Load more"}
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

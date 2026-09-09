@@ -6,7 +6,7 @@ import DataTable from "./DataTable";
 import Button from "@/components/common/Button";
 import { getAuditLogs, getGpsDevices, triggerCleanup, purgeOperationalData, PURGE_CONFIRM_PHRASE } from "@/services/admin";
 import { getSettings, updateSettings, DEFAULT_SETTINGS, AppSettings } from "@/services/settings";
-import { getTickerItems, saveTickerItems, generateId, TickerItem, DEFAULT_TICKER_ITEMS } from "@/utils/ticker";
+import { generateId, TickerItem, DEFAULT_TICKER_ITEMS } from "@/utils/ticker";
 
 interface SystemSettingsModalProps {
     onClose: () => void;
@@ -25,13 +25,34 @@ export default function SystemSettingsModal({ onClose }: SystemSettingsModalProp
     const [ratesSaving, setRatesSaving] = useState(false);
     const [ratesSaved, setRatesSaved] = useState(false);
     const [ratesError, setRatesError] = useState<string | null>(null);
-    const [tickerItems, setTickerItems] = useState<TickerItem[]>([]);
+    const [tickerItems, setTickerItems] = useState<TickerItem[]>(DEFAULT_TICKER_ITEMS);
+    const [tickerSaving, setTickerSaving] = useState(false);
     const [tickerSaved, setTickerSaved] = useState(false);
+    const [tickerError, setTickerError] = useState<string | null>(null);
 
     useEffect(() => {
-        getSettings().then(setRates).catch(() => {});
-        setTickerItems(getTickerItems());
+        getSettings().then((s) => {
+            setRates(s);
+            if (s.tickerItems?.length) setTickerItems(s.tickerItems);
+        }).catch(() => {});
     }, []);
+
+    const handleSaveTicker = async () => {
+        setTickerSaving(true);
+        setTickerError(null);
+        try {
+            const updated = await updateSettings({ tickerItems });
+            if (updated.tickerItems?.length) setTickerItems(updated.tickerItems);
+            setTickerSaved(true);
+            // Same-tab listeners (e.g. Navbar) re-fetch settings on this event.
+            window.dispatchEvent(new Event("ticker-updated"));
+            setTimeout(() => setTickerSaved(false), 2500);
+        } catch {
+            setTickerError("Failed to save. Please try again.");
+        } finally {
+            setTickerSaving(false);
+        }
+    };
 
     const handleSaveRates = async () => {
         setRatesSaving(true);
@@ -225,12 +246,10 @@ export default function SystemSettingsModal({ onClose }: SystemSettingsModalProp
                                 <TickerTab
                                     items={tickerItems}
                                     onChange={setTickerItems}
-                                    onSave={() => {
-                                        saveTickerItems(tickerItems);
-                                        setTickerSaved(true);
-                                        setTimeout(() => setTickerSaved(false), 2500);
-                                    }}
+                                    onSave={handleSaveTicker}
+                                    saving={tickerSaving}
                                     saved={tickerSaved}
+                                    error={tickerError}
                                 />
                             )}
                             {activeTab === 'config' && (
@@ -565,12 +584,16 @@ function TickerTab({
     items,
     onChange,
     onSave,
+    saving,
     saved,
+    error,
 }: {
     items: TickerItem[];
     onChange: (items: TickerItem[]) => void;
     onSave: () => void;
+    saving: boolean;
     saved: boolean;
+    error: string | null;
 }) {
     const [newText, setNewText] = useState("");
     const [newType, setNewType] = useState<"news" | "rate">("news");
@@ -771,14 +794,22 @@ function TickerTab({
                 <div className="flex items-center gap-3 mt-6 pt-4 border-t border-slate-100">
                     <Button
                         onClick={onSave}
-                        className="px-6 py-2.5 text-[10px] font-black uppercase tracking-widest shadow-md shadow-[#039B81]/20"
+                        disabled={saving}
+                        className="px-6 py-2.5 text-[10px] font-black uppercase tracking-widest shadow-md shadow-[#039B81]/20 disabled:opacity-50"
                     >
-                        {saved ? <Check size={14} className="mr-2" /> : <Save size={14} className="mr-2" />}
-                        {saved ? "Saved!" : "Save to Ticker"}
+                        {saving ? (
+                            <RefreshCw size={14} className="mr-2 animate-spin" />
+                        ) : saved ? (
+                            <Check size={14} className="mr-2" />
+                        ) : (
+                            <Save size={14} className="mr-2" />
+                        )}
+                        {saving ? "Saving..." : saved ? "Saved!" : "Save to Ticker"}
                     </Button>
                     <Button
                         variant="outline"
                         onClick={handleReset}
+                        disabled={saving}
                         className="px-6 py-2.5 text-[10px] font-black uppercase tracking-widest"
                     >
                         <RefreshCw size={14} className="mr-2" />
@@ -788,6 +819,9 @@ function TickerTab({
                         <p className="text-xs font-semibold text-emerald-600 ml-2">
                             ✓ Ticker updated — visible to all visitors immediately.
                         </p>
+                    )}
+                    {error && (
+                        <p className="text-xs font-semibold text-red-600 ml-2">{error}</p>
                     )}
                 </div>
             </div>

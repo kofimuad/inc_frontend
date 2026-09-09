@@ -1,4 +1,5 @@
 import api from './api';
+import type { TickerItem } from '../utils/ticker';
 
 export interface AppSettings {
     /** Accra / default rate per CBM (USD) — also used when location is blank/unknown */
@@ -9,6 +10,9 @@ export interface AppSettings {
     cbmRateTamale: number;
     usdToGhsRate: number;
     minFeeUsd: number;
+    /** News/rate ticker shown on the public navbar. Persisted server-side so
+     *  a change reaches every visitor, not just the admin's own browser. */
+    tickerItems: TickerItem[];
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -17,6 +21,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     cbmRateTamale: 230,
     usdToGhsRate: 15.2,
     minFeeUsd: 3,
+    tickerItems: [],
 };
 
 /**

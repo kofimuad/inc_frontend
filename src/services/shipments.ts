@@ -341,8 +341,10 @@ export interface BatchSummary {
     newItems?: number;
     matchedItems?: number;
     heldItems?: number;
+    unclaimedIntake?: number;
     createdAt?: string;
     uploadedBy?: { name?: string; email?: string } | null;
+    sourceFilename?: string;
 }
 
 /**
