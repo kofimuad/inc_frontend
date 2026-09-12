@@ -10,11 +10,12 @@ import { fmtDate, fmtDay, customerLabel } from "./parcelUi";
  * one day but its parcels were received across many days — the very thing that
  * made date-based tracking impossible. Each card shows that span explicitly.
  */
-function FanIn({ days }: { days: string[] }) {
-  if (!days.length) return null;
+function FanIn({ days }: { days?: string[] }) {
+  const list = days || [];
+  if (!list.length) return null;
   return (
-    <div className="flex items-end gap-1 h-8" title={`Receiving days: ${days.join(", ")}`}>
-      {days.map((d, i) => (
+    <div className="flex items-end gap-1 h-8" title={`Receiving days: ${list.join(", ")}`}>
+      {list.map((d, i) => (
         <div key={d} className="flex flex-col items-center gap-1">
           <div
             className="w-2 rounded-t bg-amber-400"
@@ -51,7 +52,7 @@ function ContainerCard({
         <div>
           <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-600 uppercase tracking-wide">
             <CalendarRange size={13} />
-            {c.spansReceivingDays.length} receiving days
+            {(c.spansReceivingDays || []).length} receiving days
           </div>
           <FanIn days={c.spansReceivingDays} />
         </div>
@@ -74,6 +75,7 @@ export default function ContainersView({
     [parcels, selected]
   );
   const selectedContainer = containers.find((c) => c.containerNo === selected);
+  const spanDays = selectedContainer?.spansReceivingDays || [];
 
   return (
     <div className="space-y-6">
@@ -90,13 +92,15 @@ export default function ContainersView({
               <h3 className="font-bold text-slate-800">Manifest — <span className="font-mono">{selectedContainer.containerNo}</span></h3>
               <p className="text-xs text-slate-400 font-medium mt-0.5">{manifest.length} parcels on board</p>
             </div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 rounded-lg px-3 py-1.5 ring-1 ring-amber-200">
-              <CalendarRange size={14} />
-              Received {fmtDay(selectedContainer.spansReceivingDays[0])}
-              <ArrowRight size={12} />
-              {fmtDay(selectedContainer.spansReceivingDays[selectedContainer.spansReceivingDays.length - 1])}
-              <span className="text-amber-500">· across {selectedContainer.spansReceivingDays.length} days</span>
-            </div>
+            {spanDays.length > 0 && (
+              <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 rounded-lg px-3 py-1.5 ring-1 ring-amber-200">
+                <CalendarRange size={14} />
+                Received {fmtDay(spanDays[0])}
+                <ArrowRight size={12} />
+                {fmtDay(spanDays[spanDays.length - 1])}
+                <span className="text-amber-500">· across {spanDays.length} days</span>
+              </div>
+            )}
           </div>
 
           <div className="overflow-x-auto">
