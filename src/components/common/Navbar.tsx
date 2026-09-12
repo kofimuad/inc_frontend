@@ -12,7 +12,6 @@ import { getSettings } from "@/services/settings";
 const navLinks = [
     { name: "Home", href: "/" },
     { name: "About", href: "/about" },
-    { name: "Container Loadings", href: "/container-loadings" },
     { name: "Cost Calculator", href: "/calculator" },
     { name: "Shipping Address", href: "/address" },
     { name: "Contact", href: "/contact" },
