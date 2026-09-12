@@ -34,8 +34,7 @@ function useAutoRedirect() {
             router.push(redirectTo);
         } else {
             const role = user.role?.toLowerCase();
-            if (role === "admin") router.push("/dashboard/admin");
-            else if (role === "employee") router.push("/dashboard/employee");
+            if (role === "admin" || role === "employee") router.push("/parcels");
             else router.push("/dashboard/customer");
         }
     }, [isAuthenticated, user, router, redirectTo, trackingParam]);
