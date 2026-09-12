@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Search, LayoutGrid, Container as ContainerIcon, PackageSearch, FlaskConical } from "lucide-react";
+import { Search, LayoutGrid, Container as ContainerIcon, PackageSearch, FlaskConical, UploadCloud } from "lucide-react";
 import { useParcels } from "@/hooks/useParcels";
 import type { Parcel } from "@/services/parcels";
 import ReconciliationRibbon, { type RibbonKey } from "./ReconciliationRibbon";
 import PipelineBoard from "./PipelineBoard";
 import ContainersView from "./ContainersView";
 import ParcelJourney from "./ParcelJourney";
+import UploadSheetModal from "./UploadSheetModal";
 import { customerLabel } from "./parcelUi";
 
 type Tab = "pipeline" | "containers";
@@ -22,11 +23,12 @@ const BUCKET_PREDICATE: Record<RibbonKey, (p: Parcel) => boolean> = {
 };
 
 export default function ParcelWorkspace() {
-  const { reconciliation, parcels, containers, loading, isDemo } = useParcels();
+  const { reconciliation, parcels, containers, loading, isDemo, reload } = useParcels();
   const [tab, setTab] = useState<Tab>("pipeline");
   const [bucket, setBucket] = useState<RibbonKey>("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Parcel | null>(null);
+  const [showUpload, setShowUpload] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -51,11 +53,19 @@ export default function ParcelWorkspace() {
             Every tracking number, followed across warehouse → container → arrival.
           </p>
         </div>
-        {isDemo && (
-          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full ring-1 ring-indigo-200">
-            <FlaskConical size={13} /> Sample data (July–August sheets)
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {isDemo && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full ring-1 ring-indigo-200">
+              <FlaskConical size={13} /> Sample data (July–August sheets)
+            </span>
+          )}
+          <button
+            onClick={() => setShowUpload(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold shadow-sm hover:bg-primary-dark transition-colors"
+          >
+            <UploadCloud size={16} /> Upload sheet
+          </button>
+        </div>
       </div>
 
       <ReconciliationRibbon recon={reconciliation} active={bucket} onSelect={(k) => { setBucket(k); setTab("pipeline"); }} />
@@ -90,7 +100,11 @@ export default function ParcelWorkspace() {
         <ContainersView containers={containers} parcels={parcels} onOpen={setSelected} />
       )}
 
-      <ParcelJourney parcel={selected} onClose={() => setSelected(null)} />
+      <ParcelJourney parcel={selected} onClose={() => setSelected(null)} onChanged={reload} />
+
+      {showUpload && (
+        <UploadSheetModal onClose={() => setShowUpload(false)} onUploaded={reload} />
+      )}
     </div>
   );
 }

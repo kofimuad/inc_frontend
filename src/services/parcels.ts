@@ -95,9 +95,52 @@ export async function getContainer(containerNo: string): Promise<{
   return data.data;
 }
 
-export async function uploadSheet(file: File): Promise<unknown> {
+export interface UploadPreview {
+  stage: Stage | null;
+  headerWarnings: string[];
+  missingColumns: string[];
+  totalRows: number;
+  skippedRows: number;
+  willLinkExisting: number;
+  willCreateNew: number;
+  sampleRows: { waybill: string; customerPhone: string | null; shippingMark: string | null; customerName: string | null; qty: number | null; receivedDate: string | null }[];
+}
+
+/** Preview a sheet without persisting it. */
+export async function validateSheet(file: File): Promise<UploadPreview> {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await api.post("/api/v2/uploads/validate", form, { headers: { "Content-Type": "multipart/form-data" } });
+  return data.data;
+}
+
+export interface UploadResult {
+  stage: Stage;
+  observationsInserted: number;
+  parcelsWritten: number;
+  waybillsRederived: number;
+  skippedRows: number[];
+}
+
+export async function uploadSheet(file: File): Promise<UploadResult> {
   const form = new FormData();
   form.append("file", file);
   const { data } = await api.post("/api/v2/uploads", form, { headers: { "Content-Type": "multipart/form-data" } });
   return data.data;
+}
+
+export interface ParcelAdjustment {
+  customerPhone?: string;
+  statusOverride?: string;
+  heldReason?: string;
+  staffNotes?: string;
+}
+
+/** Record a staff correction on one parcel (fix a phone, place a hold, add a note). */
+export async function adjustParcel(waybill: string, customerKey: string, body: ParcelAdjustment): Promise<Parcel | null> {
+  const { data } = await api.patch(
+    `/api/v2/parcels/${encodeURIComponent(waybill)}/${encodeURIComponent(customerKey)}`,
+    body
+  );
+  return data.data?.parcel ?? null;
 }
