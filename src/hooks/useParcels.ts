@@ -39,7 +39,7 @@ export function useParcels(): ParcelData {
 
   const load = () => {
     setState((s) => ({ ...s, loading: true }));
-    Promise.all([getReconciliation(), listParcels({ limit: 100 }), listContainers()])
+    Promise.all([getReconciliation(), listParcels({ limit: 1000 }), listContainers()])
       .then(([reconciliation, parcelPage, containers]) => {
         setState({ reconciliation, parcels: parcelPage.parcels, containers, loading: false, isDemo: false });
       })

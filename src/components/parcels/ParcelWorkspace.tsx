@@ -5,7 +5,7 @@ import { Search, LayoutGrid, Container as ContainerIcon, PackageSearch, FlaskCon
 import { useParcels } from "@/hooks/useParcels";
 import type { Parcel } from "@/services/parcels";
 import ReconciliationRibbon, { type RibbonKey } from "./ReconciliationRibbon";
-import PipelineBoard from "./PipelineBoard";
+import PipelineBoard, { type GroupBy } from "./PipelineBoard";
 import ContainersView from "./ContainersView";
 import ParcelJourney from "./ParcelJourney";
 import UploadSheetModal from "./UploadSheetModal";
@@ -30,11 +30,20 @@ export default function ParcelWorkspace() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Parcel | null>(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [groupBy, setGroupBy] = useState<GroupBy>("container");
+  const [batch, setBatch] = useState<string>("all");
+
+  // Container batches present in the data, newest first, for the batch filter.
+  const batchOptions = useMemo(
+    () => [...new Set(parcels.map((p) => p.loading?.containerNo || p.arrival?.containerNo).filter(Boolean) as string[])].sort().reverse(),
+    [parcels]
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return parcels.filter((p) => {
       if (!BUCKET_PREDICATE[bucket](p)) return false;
+      if (batch !== "all" && p.loading?.containerNo !== batch && p.arrival?.containerNo !== batch) return false;
       if (!q) return true;
       return (
         p.waybill.toLowerCase().includes(q) ||
@@ -42,7 +51,7 @@ export default function ParcelWorkspace() {
         (p.customerPhone || "").toLowerCase().includes(q)
       );
     });
-  }, [parcels, bucket, query]);
+  }, [parcels, bucket, query, batch]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -91,6 +100,32 @@ export default function ParcelWorkspace() {
         )}
       </div>
 
+      {/* group-by + batch filter (pipeline only) */}
+      {tab === "pipeline" && (
+        <div className="flex flex-wrap items-center gap-3 -mt-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-slate-400">Group by</span>
+            {([["container", "Container"], ["date", "Receiving date"], ["none", "None"]] as [GroupBy, string][]).map(([g, label]) => (
+              <button
+                key={g}
+                onClick={() => setGroupBy(g)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${groupBy === g ? "bg-primary text-white" : "bg-white text-slate-500 border border-slate-200 hover:border-primary/40"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <select
+            value={batch}
+            onChange={(e) => setBatch(e.target.value)}
+            className="ml-auto px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          >
+            <option value="all">All batches</option>
+            {batchOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      )}
+
       {tab === "uploads" ? (
         <UploadsView onChanged={reload} />
       ) : loading ? (
@@ -100,7 +135,7 @@ export default function ParcelWorkspace() {
       ) : tab === "pipeline" ? (
         <>
           <p className="text-xs text-slate-400 font-medium">{filtered.length} parcels shown</p>
-          <PipelineBoard parcels={filtered} onOpen={setSelected} />
+          <PipelineBoard parcels={filtered} onOpen={setSelected} groupBy={groupBy} />
         </>
       ) : (
         <ContainersView containers={containers} parcels={parcels} onOpen={setSelected} />
