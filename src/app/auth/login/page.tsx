@@ -264,7 +264,7 @@ function PhoneLoginForm() {
                     autoFocus
                 />
                 <p className="text-xs text-gray-400 font-medium -mt-3">
-                    Enter the phone number on your shipment with I&amp;C.
+                    Enter the phone number on your shipment with Clinette.
                 </p>
                 <Button type="submit" isLoading={isLoading} className="w-full py-4 text-xs font-black uppercase tracking-[0.2em] shadow-sm shadow-[#039B81]/20">
                     Continue

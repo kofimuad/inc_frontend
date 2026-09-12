@@ -3,7 +3,7 @@ import ParcelWorkspace from "@/components/parcels/ParcelWorkspace";
 import ProtectedRoute from "@/components/common/ProtectedRoute";
 
 export const metadata = {
-  title: "Parcel Tracking · I&C Logistics",
+  title: "Parcel Tracking · Clinette Shipping",
   description: "Track every parcel across warehouse, container and arrival.",
 };
 
@@ -17,9 +17,13 @@ export default function ParcelsPage() {
     <ProtectedRoute allowedRoles={["admin", "employee"]}>
       <main className="min-h-screen bg-slate-50">
         <div className="bg-white border-b border-slate-100">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-black text-sm">I&amp;C</div>
-            <span className="font-bold text-slate-700">Logistics Console</span>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-2.5">
+            <span className="text-base tracking-tight">
+              <span className="font-black text-slate-800">Clinette</span>{" "}
+              <span className="font-semibold text-secondary">Shipping</span>
+            </span>
+            <span className="text-slate-200">|</span>
+            <span className="font-bold text-slate-500 text-sm">Parcel Console</span>
             <Link href="/dashboard/employee" className="ml-auto text-sm font-semibold text-slate-400 hover:text-primary">← Dashboard</Link>
           </div>
         </div>
