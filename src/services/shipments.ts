@@ -1,8 +1,48 @@
+import axios from 'axios';
 import api from './api';
 import {
     NewShipmentPayload,
     CheckpointPayload,
 } from '@/types/shipment';
+
+// Plain client for the public v2 tracking endpoints — no auth interceptors, so
+// a logged-out visitor's request never triggers a token refresh.
+const publicApi = axios.create({
+    baseURL: process.env.NEXT_PUBLIC_API_URL,
+    headers: { 'Content-Type': 'application/json' },
+});
+
+// A derived Parcel (v2) mapped onto the flat shipment shape the customer
+// dashboard and public tracking page already render. Keeps those UIs unchanged
+// while the data comes from the two-layer model.
+function synthTimeline(p: any) {
+    const t: any[] = [];
+    if (p.intake)  t.push({ status: 'in_warehouse', timestamp: p.intake.date,  location: p.intake.warehouse,   note: 'Received at the warehouse' });
+    if (p.loading) t.push({ status: 'shipped',      timestamp: p.loading.loadingDate, location: p.loading.containerNo, note: 'Loaded into container' });
+    if (p.arrival) t.push({ status: 'arrived',      timestamp: p.arrival.date,  location: p.arrival.containerNo, note: 'Arrived at the port' });
+    return t;
+}
+function parcelToShipment(p: any) {
+    const container = p.loading?.containerNo ?? p.arrival?.containerNo ?? null;
+    return {
+        _id:               `${p.waybill}|${p.currentStage || ''}`,
+        waybillNo:         p.waybill,
+        status:            p.status,
+        currentStage:      p.currentStage,
+        customerName:      p.customerName ?? null,
+        destinationCity:   p.loading?.location ?? null,
+        productDescription: p.productDescription ?? null,
+        quantity:          p.qty ?? null,
+        cbm:               p.cbm ?? p.loading?.cbm ?? null,
+        containerRef:      container,
+        containerNo:       container,
+        intakeDate:        p.intake?.date ?? p.receivedDate ?? null,
+        receivingDate:     p.loading?.loadingDate ?? null,
+        estimatedDelivery: p.loading?.eta ?? null,
+        arrivalDate:       p.arrival?.date ?? null,
+        timeline:          synthTimeline(p),
+    };
+}
 
 // ═══════════════════════════════════════════════════
 // PUBLIC / CUSTOMER endpoints
@@ -38,13 +78,29 @@ export const getPublicTracking = async (
     if (identifier?.phone) params.phone = identifier.phone;
     if (identifier?.mark) params.mark = identifier.mark;
 
-    const { data: envelope } = await api.get(`/api/tracking/${trackingNumber}`, { params });
-    return envelope.data as {
-        ambiguous?: boolean;
-        total?: number;
-        choices?: TrackingChoice[];
-        items?: any[];
-        [key: string]: any;
+    const { data: envelope } = await publicApi.get(
+        `/api/v2/track/waybill/${encodeURIComponent(trackingNumber)}`,
+        { params },
+    );
+    const d = envelope.data;
+    if (d.ambiguous) {
+        return {
+            ambiguous: true,
+            total: d.total,
+            choices: (d.choices || []).map((c: any): TrackingChoice => ({
+                customerName: c.name ?? null,
+                customerPhone: c.phone ?? null,
+                shippingMark: c.mark ?? null,
+                destinationCity: null,
+                status: '',
+            })),
+            items: [] as any[],
+        };
+    }
+    return {
+        ambiguous: false,
+        total: d.total,
+        items: (d.parcels || []).map(parcelToShipment),
     };
 };
 
@@ -56,8 +112,8 @@ export const getPublicTracking = async (
  * phone number.
  */
 export const getPublicTrackingByMark = async (mark: string) => {
-    const { data: envelope } = await api.get(`/api/tracking/mark/${encodeURIComponent(mark)}`);
-    return envelope.data as { total: number; items: any[] };
+    const { data: envelope } = await publicApi.get(`/api/v2/track/mark/${encodeURIComponent(mark)}`);
+    return { total: envelope.data.total, items: (envelope.data.parcels || []).map(parcelToShipment) };
 };
 
 /**
@@ -66,24 +122,23 @@ export const getPublicTrackingByMark = async (mark: string) => {
  * Returns { total, grouped: { in_warehouse, shipped, held } }
  */
 export const getPublicTrackingByPhone = async (phone: string) => {
-    const { data: envelope } = await api.get(`/api/tracking/phone/${encodeURIComponent(phone)}`);
-    return envelope.data as {
-        total: number;
-        grouped: {
-            in_warehouse: any[];
-            shipped: any[];
-            held: any[];
-        };
-    };
+    const { data: envelope } = await publicApi.get(`/api/v2/track/phone/${encodeURIComponent(phone)}`);
+    const items = (envelope.data.parcels || []).map(parcelToShipment);
+    const grouped: Record<string, any[]> = {};
+    for (const it of items) (grouped[it.status] = grouped[it.status] || []).push(it);
+    return { total: envelope.data.total, grouped, items };
 };
 
 /**
  * Customers: See only your own shipments (paginated)
  * GET /api/batch-shipments/mine
  */
-export const getMyShipments = async (params: Record<string, any> = {}) => {
-    const { data: envelope } = await api.get('/api/batch-shipments/mine', { params });
-    return envelope.data;
+export const getMyShipments = async (
+    _params: Record<string, any> = {},
+): Promise<{ total: number; items: any[]; grouped?: Record<string, any[]> }> => {
+    const { data: envelope } = await api.get('/api/v2/parcels/mine');
+    const items = (envelope.data.parcels || []).map(parcelToShipment);
+    return { total: envelope.data.total ?? items.length, items };
 };
 
 // ═══════════════════════════════════════════════════
@@ -162,8 +217,21 @@ export const logCheckpoint = async (id: string, payload: CheckpointPayload) => {
  * GET /api/dashboard/customer/stats
  */
 export const getCustomerStats = async () => {
-    const { data: envelope } = await api.get('/api/dashboard/customer/stats');
-    return envelope.data;
+    const { data: envelope } = await api.get('/api/v2/parcels/mine');
+    const parcels: any[] = envelope.data.parcels || [];
+    const inTransit = parcels.filter((p) => p.currentStage === 'loading').length;
+    const delivered = parcels.filter((p) => p.currentStage === 'arrival').length;
+    const etas = parcels
+        .map((p) => p.loading?.eta)
+        .filter(Boolean)
+        .sort();
+    return {
+        totalShipments: parcels.length,
+        totalItems: parcels.length,
+        inTransit,
+        delivered,
+        nextDelivery: etas[0] || null,
+    };
 };
 
 /**
