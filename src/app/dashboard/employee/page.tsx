@@ -3,494 +3,173 @@
 import Link from "next/link";
 import Navbar from "@/components/common/Navbar";
 import StatsWidget from "@/components/dashboard/StatsWidget";
-import CreateShipmentModal from "@/components/dashboard/CreateShipmentModal";
-import BulkUploadModal from "@/components/dashboard/BulkUploadModal";
-import EditItemModal from "@/components/dashboard/EditItemModal";
-import ExpandableUploadCard from "@/components/dashboard/ExpandableUploadCard";
-import BatchEditModal from "@/components/dashboard/BatchEditModal";
-import { Ship, CheckCircle, Clock, Plus, Power, FileUp, RefreshCw, Anchor, Package, Warehouse, Search, AlertTriangle, Radar } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
-import Button from "@/components/common/Button";
-import { useDebounce } from "@/hooks/useDebounce";
-import { getBatchShipments, getEmployeeStats, deleteBatchItem, getBatches, fetchBatchItems, retractBatch, type BatchSummary } from "@/services/shipments";
-import { listContainerLoadingsStaff, deleteContainerLoading, listContainerItems, type ContainerLoading } from "@/services/containerLoadings";
-import ContainerLoadingModal from "@/components/dashboard/ContainerLoadingModal";
+import {
+  Ship, Warehouse, PackageCheck, AlertTriangle, Power, RefreshCw,
+  UploadCloud, LayoutGrid, Container as ContainerIcon, Search, Radar, FlaskConical,
+} from "lucide-react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/common/ProtectedRoute";
-import { STATUS_COLORS } from "@/config/constants";
+import { useParcels } from "@/hooks/useParcels";
+import type { Parcel } from "@/services/parcels";
+import ParcelCard from "@/components/parcels/ParcelCard";
+import ContainersView from "@/components/parcels/ContainersView";
+import ParcelJourney from "@/components/parcels/ParcelJourney";
+import UploadSheetModal from "@/components/parcels/UploadSheetModal";
+import { customerLabel } from "@/components/parcels/parcelUi";
 
+type Tab = "goods_received" | "container_loadings" | "arrived";
+
+/**
+ * Employee dashboard, cut over to the two-layer parcel model. Stats are live
+ * reconciliation counts; the three tabs map onto the parcel pipeline (goods
+ * received = still in warehouse, container loadings = containers, arrived =
+ * landed in Ghana). Uploads go through the v2 endpoint.
+ */
 export default function EmployeeDashboard() {
-    const { logout, user } = useAuth();
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
-    const [stats, setStats] = useState<any>(null);
-    const [searchQuery, setSearchQuery] = useState("");
-    // Three logistics lists matching the three upload stages.
-    const [activeList, setActiveList] = useState<'goods_received' | 'container_loadings' | 'arrived'>('goods_received');
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  const { logout, user } = useAuth();
+  const { reconciliation, parcels, containers, loading, isDemo, reload } = useParcels();
+  const [tab, setTab] = useState<Tab>("goods_received");
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<Parcel | null>(null);
+  const [showUpload, setShowUpload] = useState(false);
 
-    // Card groups for the active tab.
-    const [containers, setContainers] = useState<ContainerLoading[]>([]);
-    const [batchGroups, setBatchGroups] = useState<BatchSummary[]>([]);
-    // Goods Received only: how many of each intake batch's items are still
-    // in_warehouse/held (the rest were loaded onto a packing list and are no
-    // longer shown as items inside the card, but the card total still counts
-    // them — this fills that gap in so staff don't think rows vanished).
-    const [remainingCounts, setRemainingCounts] = useState<Record<string, number>>({});
-    const [groupsLoading, setGroupsLoading] = useState(true);
-    // A failed load used to fall through to an empty list, so a throttled or
-    // expired session was indistinguishable from "there is nothing here" — and
-    // staff looking for an upload to retract concluded it had vanished.
-    const [groupsError, setGroupsError] = useState<string | null>(null);
-    // Bumped after an item edit/delete so an open card reloads its items.
-    const [itemsRefreshKey, setItemsRefreshKey] = useState(0);
+  const warehouse = useMemo(() => parcels.filter((p) => p.flags.receivedNotLoaded), [parcels]);
+  const arrived   = useMemo(() => parcels.filter((p) => p.currentStage === "arrival"), [parcels]);
 
-    // Edit Item Modal State
-    const [editingItem, setEditingItem] = useState<any>(null);
-
-    // Container Loadings state
-    const [containerModalOpen, setContainerModalOpen] = useState(false);
-    const [editingContainer, setEditingContainer]   = useState<ContainerLoading | undefined>(undefined);
-    const [deletingContainerId, setDeletingContainerId] = useState<string | null>(null);
-
-    // Batch (Goods Received / Arrived upload) edit + delete state
-    const [editingBatch, setEditingBatch] = useState<BatchSummary | null>(null);
-    const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
-
-    const fetchStats = useCallback(async () => {
-        try {
-            const [coreStats, allBatch, onHoldBatch] = await Promise.all([
-                getEmployeeStats(),
-                getBatchShipments({ limit: 1 }),
-                getBatchShipments({ limit: 1, status: 'held' }),
-            ]);
-
-            const totalBatch = allBatch?.pagination?.total || 0;
-
-            setStats({
-                activeShipments: (coreStats?.activeShipments || 0) + totalBatch,
-                pendingUpdates:  coreStats?.pendingUpdates || 0,
-                heldShipments:   (coreStats?.heldShipments || 0) + (onHoldBatch?.pagination?.total || 0),
-                completedToday:  coreStats?.completedToday || 0,
-            });
-        } catch (error) {
-            console.error("Failed to fetch stats:", error);
-        }
-    }, []);
-
-    // Fetch the card groups (batches or containers) for the active tab.
-    const fetchGroups = useCallback(async () => {
-        setGroupsLoading(true);
-        setGroupsError(null);
-        try {
-            const search = debouncedSearchQuery || undefined;
-            if (activeList === 'container_loadings') {
-                const r = await listContainerLoadingsStaff({ limit: 50, search });
-                setContainers(r.containers);
-            } else {
-                const stage = activeList === 'goods_received' ? 'intake' : 'arrived';
-                const r = await getBatches({ stage, limit: 50, search });
-                setBatchGroups(r.batches);
-
-                // Loaded customers are hidden from a Goods Received card's item
-                // list (status filter below), so surface how many of each
-                // batch's items are still in the warehouse alongside the total.
-                if (activeList === 'goods_received') {
-                    const entries = await Promise.all(
-                        r.batches.map(async (b) => {
-                            try {
-                                const items = await fetchBatchItems(b._id, { status: 'in_warehouse,held', limit: 1 });
-                                return [b._id, items?.pagination?.total ?? 0] as const;
-                            } catch {
-                                return [b._id, b.totalItems ?? 0] as const;
-                            }
-                        })
-                    );
-                    setRemainingCounts(Object.fromEntries(entries));
-                } else {
-                    setRemainingCounts({});
-                }
-            }
-        } catch (err: any) {
-            setGroupsError(
-                err?.response?.data?.message ||
-                "Couldn't load this list. Check your connection and try again."
-            );
-            setContainers([]);
-            setBatchGroups([]);
-        } finally {
-            setGroupsLoading(false);
-        }
-    }, [activeList, debouncedSearchQuery]);
-
-    useEffect(() => { fetchGroups(); }, [fetchGroups]);
-    useEffect(() => { fetchStats(); }, [fetchStats]);
-
-    // Full refresh after uploads / edits.
-    const refresh = useCallback(async () => {
-        setIsRefreshing(true);
-        try {
-            await Promise.all([fetchStats(), fetchGroups()]);
-            setItemsRefreshKey((k) => k + 1);
-        } finally {
-            setIsRefreshing(false);
-        }
-    }, [fetchStats, fetchGroups]);
-
-    const handleDeleteItem = async (item: any) => {
-        const ok = window.confirm(
-            `Delete shipment ${item.waybillNo}?\n\nThis permanently removes this one shipment record${item.customerName ? ` (${item.customerName})` : ""}. This cannot be undone.`
-        );
-        if (!ok) return;
-        try {
-            await deleteBatchItem(item._id);
-            setItemsRefreshKey((k) => k + 1);
-            fetchStats();
-        } catch (err: any) {
-            alert(err?.response?.data?.message || "Failed to delete shipment. Please try again.");
-        }
-    };
-
-    const handleDeleteBatch = async (b: BatchSummary) => {
-        const noun = b.stage === 'arrived' ? 'arrival upload' : 'goods-received upload';
-        const ok = window.confirm(
-            `Delete this ${noun} (${b.label || b.batchCode})?\n\nThis reverses everything the upload did — its ${b.totalItems ?? 0} item(s) are removed/rolled back. This cannot be undone.`
-        );
-        if (!ok) return;
-        setDeletingBatchId(b._id);
-        try {
-            await retractBatch(b._id);
-            setBatchGroups((prev) => prev.filter((x) => x._id !== b._id));
-            fetchStats();
-        } catch (err: any) {
-            alert(err?.response?.data?.message || "Failed to delete this upload. Please try again.");
-        } finally {
-            setDeletingBatchId(null);
-        }
-    };
-
-    const handleDeleteContainer = async (c: ContainerLoading) => {
-        const ok = window.confirm(
-            `Delete container ${c.containerNumber}?\n\nThis removes the container record and clears its number from any shipments that reference it. This cannot be undone.`
-        );
-        if (!ok) return;
-        setDeletingContainerId(c._id);
-        try {
-            await deleteContainerLoading(c._id);
-            setContainers((prev) => prev.filter((x) => x._id !== c._id));
-        } catch (err: any) {
-            alert(err?.response?.data?.message || "Failed to delete container. Please try again.");
-        } finally {
-            setDeletingContainerId(null);
-        }
-    };
-
-    const handleLogout = async () => {
-        await logout();
-    };
-
-    // Format status for display
-    const formatStatus = (status: string) => {
-        return status?.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN';
-    };
-
-    const getStatusColor = (status: string) => {
-        return STATUS_COLORS[status] || STATUS_COLORS.default;
-    };
-
-    const containerStatusColors: Record<string, string> = {
-        loading: "bg-yellow-100 text-yellow-700",
-        shipped: "bg-blue-100 text-blue-700",
-        at_port: "bg-orange-100 text-orange-700",
-        arrived: "bg-emerald-100 text-emerald-700",
-        ready:   "bg-[#039B81]/10 text-[#039B81]",
-    };
-    const containerStatusLabel = (s: string) => (s === "at_port" ? "At Tema Port" : s.replace(/_/g, " "));
-
-    const searchPlaceholder =
-        activeList === 'container_loadings' ? "Search container #, BL, or vessel..."
-        : activeList === 'goods_received'   ? "Search goods-received uploads (batch code)..."
-        :                                     "Search arrived uploads (batch code)...";
-
-    return (
-        <ProtectedRoute allowedRoles={['employee', 'admin']}>
-            <div className="bg-slate-50 min-h-screen">
-                <Navbar />
-                <main className="pt-32 pb-20">
-                    <div className="container mx-auto px-4">
-                        {/* Header */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-                            <div>
-                                <h1 className="text-4xl font-black text-slate-800 tracking-tight mb-2">Employee Portal</h1>
-                                <p className="text-slate-500 font-medium">
-                                    {user ? `Welcome, ${user.name}` : "Manage logistics operations and updates."}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Link
-                                    href="/parcels"
-                                    className="flex items-center justify-center w-full md:w-auto py-3 px-6 text-xs font-black uppercase tracking-[0.2em] bg-[#039B81] text-white rounded-xl shadow-xl shadow-[#039B81]/20 hover:bg-[#027a65] transition-colors"
-                                >
-                                    <Radar size={18} className="mr-2" />
-                                    Parcel Tracking
-                                </Link>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setIsBulkModalOpen(true)}
-                                    className="w-full md:w-auto py-3 px-6 text-xs font-black uppercase tracking-[0.2em] bg-white border-2 border-slate-200"
-                                >
-                                    <FileUp size={18} className="mr-2" />
-                                    Bulk Update
-                                </Button>
-                                <Button onClick={() => setIsCreateModalOpen(true)} className="w-full md:w-auto py-3 px-6 text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-[#039B81]/20">
-                                    <Plus size={18} className="mr-2" />
-                                    New Shipment
-                                </Button>
-                                <button
-                                    onClick={() => refresh()}
-                                    className={`p-3 bg-white border-2 border-slate-200 text-slate-400 hover:text-[#039B81] hover:border-[#039B81]/30 rounded-xl transition-all shrink-0 ${isRefreshing ? 'animate-spin text-[#039B81]' : ''}`}
-                                    title="Refresh Data"
-                                >
-                                    <RefreshCw size={20} />
-                                </button>
-                                <button onClick={handleLogout} className="p-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors shrink-0" title="Logout">
-                                    <Power size={20} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Stats Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                            <StatsWidget
-                                title="Active Shipments"
-                                value={stats ? String(stats.activeShipments ?? 0) : "..."}
-                                icon={Ship}
-                                color="indigo"
-                            />
-                            <StatsWidget
-                                title="Pending Updates"
-                                value={stats ? String(stats.pendingUpdates ?? 0) : "..."}
-                                icon={Clock}
-                                color="amber"
-                            />
-                            <StatsWidget
-                                title="On Hold"
-                                value={stats ? String(stats.heldShipments ?? 0) : "..."}
-                                icon={AlertTriangle}
-                                color="rose"
-                            />
-                            <StatsWidget
-                                title="Completed Today"
-                                value={stats ? String(stats.completedToday ?? 0) : "..."}
-                                icon={CheckCircle}
-                                color="emerald"
-                            />
-                        </div>
-
-                        {/* Logistics — three lists matching the upload stages */}
-                        <div>
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                                <div className="flex flex-wrap bg-slate-200/50 p-1.5 rounded-2xl border border-slate-200/60 self-start">
-                                    {[
-                                        { id: 'goods_received',     label: 'Goods Received',     icon: Warehouse },
-                                        { id: 'container_loadings', label: 'Container Loadings', icon: Anchor },
-                                        { id: 'arrived',            label: 'Arrived Goods',      icon: Package },
-                                    ].map((s) => {
-                                        const Icon = s.icon;
-                                        return (
-                                            <button
-                                                key={s.id}
-                                                onClick={() => setActiveList(s.id as any)}
-                                                className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all ${
-                                                    activeList === s.id
-                                                    ? "bg-white text-[#039B81] shadow-lg shadow-[#039B81]/10"
-                                                    : "text-slate-500 hover:text-slate-800"
-                                                }`}
-                                            >
-                                                <Icon size={13} />
-                                                {s.label}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                {activeList === 'container_loadings' && (
-                                    <Button
-                                        onClick={() => { setEditingContainer(undefined); setContainerModalOpen(true); }}
-                                        className="py-2.5 px-5 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#039B81]/20 self-start"
-                                    >
-                                        <Plus size={16} className="mr-2" />
-                                        New Container
-                                    </Button>
-                                )}
-                            </div>
-
-                            {/* Search for the active list */}
-                            <div className="relative max-w-md mb-6">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder={searchPlaceholder}
-                                    className="w-full pl-12 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:border-[#039B81]/50 transition-all"
-                                />
-                            </div>
-
-                            {groupsLoading ? (
-                                <div className="bg-white rounded-2xl border border-slate-100 py-16 flex justify-center text-slate-400 font-medium tracking-widest text-sm uppercase">
-                                    Loading…
-                                </div>
-                            ) : groupsError ? (
-                                <div className="bg-white rounded-2xl border border-red-100 py-10 px-6 text-center">
-                                    <AlertTriangle size={20} className="text-red-500 mx-auto mb-3" />
-                                    <p className="text-xs text-red-600 font-bold leading-relaxed">{groupsError}</p>
-                                    <button
-                                        onClick={fetchGroups}
-                                        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-slate-200 text-[10px] font-black text-slate-500 hover:text-[#039B81] uppercase tracking-widest transition-colors"
-                                    >
-                                        <RefreshCw size={12} /> Try again
-                                    </button>
-                                </div>
-                            ) : activeList === 'container_loadings' ? (
-                                containers.length === 0 ? (
-                                    <div className="bg-white rounded-2xl border border-slate-100 py-10 text-center text-slate-400 text-xs font-black uppercase tracking-widest">
-                                        {searchQuery ? "No containers match your search." : "No containers yet. Containers are auto-created from shipped batch uploads."}
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {containers.map((c) => (
-                                            <ExpandableUploadCard
-                                                key={c._id}
-                                                title={c.containerNumber}
-                                                icon={<Anchor size={16} className="text-[#039B81] shrink-0" />}
-                                                badge={{ label: containerStatusLabel(c.status), className: containerStatusColors[c.status] || "bg-slate-100 text-slate-500" }}
-                                                meta={[
-                                                    ...(c.eta        ? [{ label: "ETA",    value: new Date(c.eta).toLocaleDateString("en-GB") }] : []),
-                                                    ...(c.vesselName ? [{ label: "Vessel", value: c.vesselName }] : []),
-                                                    ...(c.blNumber   ? [{ label: "BL",     value: c.blNumber }] : []),
-                                                ]}
-                                                onEdit={() => { setEditingContainer(c); setContainerModalOpen(true); }}
-                                                onDelete={() => handleDeleteContainer(c)}
-                                                deleting={deletingContainerId === c._id}
-                                                // Everything on this container — items from the packing
-                                                // list that created it plus any attached by hand from
-                                                // the Goods Received tab.
-                                                loadItems={async () => (await listContainerItems(c._id)).items}
-                                                onEditItem={setEditingItem}
-                                                onDeleteItem={handleDeleteItem}
-                                                statusColor={getStatusColor}
-                                                formatStatus={formatStatus}
-                                                reloadKey={itemsRefreshKey}
-                                            />
-                                        ))}
-                                    </div>
-                                )
-                            ) : (
-                                batchGroups.length === 0 ? (
-                                    <div className="bg-white rounded-2xl border border-slate-100 py-10 text-center text-slate-400 text-xs font-black uppercase tracking-widest">
-                                        {searchQuery
-                                            ? "No uploads match your search."
-                                            : activeList === 'goods_received' ? "No goods-received uploads yet." : "No arrived-goods uploads yet."}
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {batchGroups.map((b) => (
-                                            <ExpandableUploadCard
-                                                key={b._id}
-                                                title={b.label || b.batchCode}
-                                                icon={activeList === 'goods_received'
-                                                    ? <Warehouse size={16} className="text-[#039B81] shrink-0" />
-                                                    : <Package size={16} className="text-purple-500 shrink-0" />}
-                                                badge={{ label: `${b.totalItems ?? 0} items`, className: "bg-slate-100 text-slate-600" }}
-                                                meta={[
-                                                    ...(b.createdAt ? [{ label: "Uploaded", value: new Date(b.createdAt).toLocaleDateString("en-GB") }] : []),
-                                                    ...((b.heldItems ?? 0) > 0 ? [{ label: "Held", value: String(b.heldItems) }] : []),
-                                                    // Loaded items no longer show in this card's list — this makes clear
-                                                    // the batch is partly loaded rather than looking like rows vanished.
-                                                    ...(activeList === 'goods_received' && remainingCounts[b._id] !== undefined && remainingCounts[b._id] < (b.totalItems ?? 0)
-                                                        ? [{ label: "In warehouse", value: `${remainingCounts[b._id]} of ${b.totalItems ?? 0}` }]
-                                                        : []),
-                                                ]}
-                                                onEdit={() => setEditingBatch(b)}
-                                                onDelete={() => handleDeleteBatch(b)}
-                                                deleting={deletingBatchId === b._id}
-                                                loadItems={async () => (await fetchBatchItems(
-                                                    b._id,
-                                                    activeList === 'goods_received' ? { status: 'in_warehouse,held' } : {}
-                                                )).items}
-                                                onEditItem={setEditingItem}
-                                                onDeleteItem={handleDeleteItem}
-                                                statusColor={getStatusColor}
-                                                formatStatus={formatStatus}
-                                                reloadKey={itemsRefreshKey}
-                                            />
-                                        ))}
-                                    </div>
-                                )
-                            )}
-                        </div>
-                    </div>
-                </main>
-                <CreateShipmentModal
-                    isOpen={isCreateModalOpen}
-                    onClose={() => setIsCreateModalOpen(false)}
-                    onSuccess={refresh}
-                />
-
-                <BulkUploadModal
-                    isOpen={isBulkModalOpen}
-                    onClose={() => setIsBulkModalOpen(false)}
-                    onSuccess={refresh}
-                />
-
-                {editingItem && (
-                    <EditItemModal
-                        item={editingItem}
-                        onClose={() => setEditingItem(null)}
-                        onSaved={() => {
-                            setEditingItem(null);
-                            // The same record backs all three tabs — an edit here
-                            // (a container ref, a status) can move it between them.
-                            refresh();
-                        }}
-                    />
-                )}
-
-                {editingBatch && (
-                    <BatchEditModal
-                        batch={editingBatch}
-                        onClose={() => setEditingBatch(null)}
-                        onSaved={(updated, synced) => {
-                            setBatchGroups((prev) => prev.map((b) => (b._id === updated._id ? { ...b, ...updated } : b)));
-                            // A bulk status change moves items other tabs also show.
-                            if (synced) refresh();
-                            else setEditingBatch(null);
-                        }}
-                    />
-                )}
-
-                {containerModalOpen && (
-                    <ContainerLoadingModal
-                        existing={editingContainer}
-                        onClose={() => setContainerModalOpen(false)}
-                        onSaved={(saved, synced) => {
-                            setContainers((prev) => {
-                                const idx = prev.findIndex((c) => c._id === saved._id);
-                                if (idx >= 0) {
-                                    const next = [...prev];
-                                    next[idx] = saved;
-                                    return next;
-                                }
-                                return [saved, ...prev];
-                            });
-                            // Moving the container moved its cargo — the Goods
-                            // Received and Arrived lists are stale now.
-                            if (synced) refresh();
-                        }}
-                    />
-                )}
-            </div>
-        </ProtectedRoute>
+  const filtered = (list: Parcel[]) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((p) =>
+      p.waybill.toLowerCase().includes(q) ||
+      customerLabel(p).toLowerCase().includes(q) ||
+      (p.customerPhone || "").includes(q)
     );
+  };
+
+  const TABS: { id: Tab; label: string; icon: typeof Warehouse }[] = [
+    { id: "goods_received",     label: "Goods Received",     icon: Warehouse },
+    { id: "container_loadings", label: "Container Loadings", icon: ContainerIcon },
+    { id: "arrived",            label: "Arrived Goods",      icon: PackageCheck },
+  ];
+
+  const handleLogout = () => logout();
+
+  const cardGrid = (list: Parcel[], empty: string) => (
+    list.length === 0 ? (
+      <div className="bg-white rounded-2xl border border-slate-100 py-16 text-center text-slate-400 font-medium tracking-widest text-sm uppercase">{empty}</div>
+    ) : (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {list.map((p) => <ParcelCard key={(p._id || p.waybill) + p.customerKey} parcel={p} onOpen={setSelected} />)}
+      </div>
+    )
+  );
+
+  return (
+    <ProtectedRoute allowedRoles={["employee", "admin"]}>
+      <Navbar />
+      <main className="pt-32 pb-20 bg-slate-50 min-h-screen">
+        <div className="container mx-auto px-4">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+            <div>
+              <h1 className="text-4xl font-black text-slate-800 tracking-tight mb-2">Employee Portal</h1>
+              <p className="text-slate-500 font-medium flex items-center gap-2">
+                {user ? `Welcome, ${user.name}` : "Manage logistics operations and updates."}
+                {isDemo && (
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full ring-1 ring-indigo-200">
+                    <FlaskConical size={12} /> Sample data
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowUpload(true)}
+                className="inline-flex items-center gap-2 py-3 px-6 text-xs font-black uppercase tracking-[0.2em] bg-[#039B81] text-white rounded-xl shadow-xl shadow-[#039B81]/20 hover:bg-[#027a65] transition-colors"
+              >
+                <UploadCloud size={18} /> Upload Sheet
+              </button>
+              <Link
+                href="/parcels"
+                className="inline-flex items-center gap-2 py-3 px-6 text-xs font-black uppercase tracking-[0.2em] bg-white border-2 border-slate-200 text-slate-700 rounded-xl hover:border-[#039B81]/40 transition-colors"
+              >
+                <Radar size={18} /> Full Board
+              </Link>
+              <button
+                onClick={() => reload()}
+                className={`p-3 bg-white border-2 border-slate-200 text-slate-400 hover:text-[#039B81] hover:border-[#039B81]/30 rounded-xl transition-all shrink-0 ${loading ? "animate-spin text-[#039B81]" : ""}`}
+                title="Refresh Data"
+              >
+                <RefreshCw size={20} />
+              </button>
+              <button onClick={handleLogout} className="p-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors shrink-0" title="Logout">
+                <Power size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Stats — live reconciliation */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <StatsWidget title="In Warehouse" value={reconciliation.receivedNotLoaded} icon={Warehouse} color="amber" description="Received, awaiting a container" />
+            <StatsWidget title="On the Water" value={reconciliation.loaded} icon={Ship} color="indigo" description="Loaded and shipped" />
+            <StatsWidget title="Arrived" value={reconciliation.arrived} icon={PackageCheck} color="emerald" description="Landed at the port" />
+            <StatsWidget title="Needs Attention" value={reconciliation.needsPhone + reconciliation.loadedNeverReceived} icon={AlertTriangle} color="rose" description="Missing phone or intake record" />
+          </div>
+
+          {/* Tabs */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div className="flex flex-wrap bg-slate-200/50 p-1.5 rounded-2xl border border-slate-200/60 self-start">
+              {TABS.map((s) => {
+                const Icon = s.icon;
+                const active = tab === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setTab(s.id)}
+                    className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all ${active ? "bg-white text-[#039B81] shadow-lg shadow-[#039B81]/10" : "text-slate-500 hover:text-slate-800"}`}
+                  >
+                    <Icon size={13} /> {s.label}
+                  </button>
+                );
+              })}
+            </div>
+            {tab !== "container_loadings" && (
+              <div className="relative max-w-md w-full">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search tracking no., customer, phone…"
+                  className="w-full pl-12 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#039B81]/20 focus:border-[#039B81]/50 transition-all"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Content */}
+          {loading ? (
+            <div className="bg-white rounded-2xl border border-slate-100 py-16 flex items-center justify-center text-slate-400 gap-2 font-medium">
+              <LayoutGrid className="animate-pulse" /> Loading parcels…
+            </div>
+          ) : tab === "container_loadings" ? (
+            <ContainersView containers={containers} parcels={parcels} onOpen={setSelected} />
+          ) : tab === "goods_received" ? (
+            <>
+              <p className="text-xs text-slate-400 font-medium mb-3">{filtered(warehouse).length} parcels in the warehouse, awaiting a container</p>
+              {cardGrid(filtered(warehouse), "No parcels in the warehouse")}
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-slate-400 font-medium mb-3">{filtered(arrived).length} parcels arrived</p>
+              {cardGrid(filtered(arrived), "No arrived parcels yet")}
+            </>
+          )}
+        </div>
+
+        <ParcelJourney parcel={selected} onClose={() => setSelected(null)} onChanged={reload} />
+        {showUpload && <UploadSheetModal onClose={() => setShowUpload(false)} onUploaded={reload} />}
+      </main>
+    </ProtectedRoute>
+  );
 }
