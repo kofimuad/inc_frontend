@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState, useEffect } from "react";
 
 import Navbar from "@/components/common/Navbar";
 import StatsWidget from "@/components/dashboard/StatsWidget";
 import DataTable from "@/components/dashboard/DataTable";
-import { Users, Shield, TrendingUp, Package, Plus, UserPlus, Settings, Power, X, Eye, EyeOff } from "lucide-react";
+import { Users, Shield, TrendingUp, Package, Plus, UserPlus, Settings, Power, X, Eye, EyeOff, Radar } from "lucide-react";
 import Button from "@/components/common/Button";
 import { getAdminDashboardStats } from "@/services/shipments";
 import { getUsers, createUser, updateUser } from "@/services/admin";
@@ -142,8 +143,15 @@ export default function AdminDashboard() {
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
-                            <Button 
-                                variant="outline" 
+                            <Link
+                                href="/parcels"
+                                className="flex items-center justify-center py-3 px-6 text-xs font-black uppercase tracking-[0.2em] bg-[#039B81] text-white rounded-xl shadow-xl shadow-[#039B81]/20 hover:bg-[#027a65] transition-colors"
+                            >
+                                <Radar size={18} className="mr-2" />
+                                Parcel Tracking
+                            </Link>
+                            <Button
+                                variant="outline"
                                 onClick={() => setShowSettingsModal(true)}
                                 className="py-3 text-xs font-black uppercase tracking-[0.2em]"
                             >

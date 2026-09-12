@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import Navbar from "@/components/common/Navbar";
 import StatsWidget from "@/components/dashboard/StatsWidget";
 import CreateShipmentModal from "@/components/dashboard/CreateShipmentModal";
@@ -7,7 +8,7 @@ import BulkUploadModal from "@/components/dashboard/BulkUploadModal";
 import EditItemModal from "@/components/dashboard/EditItemModal";
 import ExpandableUploadCard from "@/components/dashboard/ExpandableUploadCard";
 import BatchEditModal from "@/components/dashboard/BatchEditModal";
-import { Ship, CheckCircle, Clock, Plus, Power, FileUp, RefreshCw, Anchor, Package, Warehouse, Search, AlertTriangle } from "lucide-react";
+import { Ship, CheckCircle, Clock, Plus, Power, FileUp, RefreshCw, Anchor, Package, Warehouse, Search, AlertTriangle, Radar } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import Button from "@/components/common/Button";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -227,6 +228,13 @@ export default function EmployeeDashboard() {
                                 </p>
                             </div>
                             <div className="flex items-center gap-3">
+                                <Link
+                                    href="/parcels"
+                                    className="flex items-center justify-center w-full md:w-auto py-3 px-6 text-xs font-black uppercase tracking-[0.2em] bg-[#039B81] text-white rounded-xl shadow-xl shadow-[#039B81]/20 hover:bg-[#027a65] transition-colors"
+                                >
+                                    <Radar size={18} className="mr-2" />
+                                    Parcel Tracking
+                                </Link>
                                 <Button
                                     variant="outline"
                                     onClick={() => setIsBulkModalOpen(true)}
