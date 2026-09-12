@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { setAccessToken } from "@/services/api";
+import { setAccessToken, setRefreshToken } from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
 
 function GoogleCallbackContent() {
@@ -13,6 +13,7 @@ function GoogleCallbackContent() {
 
     useEffect(() => {
         const token = searchParams.get("token");
+        const rt = searchParams.get("rt");
         const errorParam = searchParams.get("error");
 
         if (errorParam) {
@@ -24,6 +25,8 @@ function GoogleCallbackContent() {
         if (token) {
             // Store token in localStorage so it persists across page reloads
             setAccessToken(token);
+            // Refresh-token fallback for when the cross-site cookie is dropped.
+            if (rt) setRefreshToken(rt);
             // Then fetch the user profile
             fetchUser().catch(() => {
                 setError("Failed to load user profile.");

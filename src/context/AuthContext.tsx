@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import api, {
     setAccessToken,
+    setRefreshToken,
+    getRefreshToken,
     onSessionExpired,
     resetSessionExpiry,
     endSession,
@@ -34,7 +36,7 @@ interface User {
 interface AuthContextType {
     user: User | null;
     login: (credentials: { email: string; password: string }) => Promise<void>;
-    loginWithToken: (tokenData: { accessToken: string; user: User }) => void;
+    loginWithToken: (tokenData: { accessToken: string; refreshToken?: string; user: User }) => void;
     register: (userData: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
     logout: () => Promise<void>;
     fetchUser: () => Promise<void>;
@@ -139,6 +141,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setAccessToken(token);
                 console.log('[AuthContext] Token set in memory');
             }
+            // Store the refresh token too, as a fallback for browsers that drop
+            // the cross-site httpOnly cookie.
+            const refreshToken = envelope.data?.refreshToken || envelope.refreshToken;
+            if (refreshToken) setRefreshToken(refreshToken);
 
             // If the backend returned user data directly, use it; otherwise fetch
             if (envelope.data?.user) {
@@ -160,8 +166,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const loginWithToken = (tokenData: { accessToken: string; user: User }) => {
+    const loginWithToken = (tokenData: { accessToken: string; refreshToken?: string; user: User }) => {
         setAccessToken(tokenData.accessToken);
+        if (tokenData.refreshToken) setRefreshToken(tokenData.refreshToken);
         setUser(tokenData.user);
         setSessionExpired(false);
         setSessionEndReason(null);
@@ -190,13 +197,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const logout = async () => {
         try {
             setIsLoading(true);
-            // Hit the logout endpoint to instruct the backend to clear the httpOnly refresh cookie
-            await api.post("/api/auth/logout");
+            // Hit the logout endpoint to revoke the refresh token. Send the stored
+            // token in the body so it is revoked even when the cookie was dropped.
+            await api.post("/api/auth/logout", { refreshToken: getRefreshToken() });
         } catch (error) {
             console.error("Logout request failed, proceeding to wipe local state:", error);
         } finally {
             setUser(null);
             setAccessToken(null);
+            setRefreshToken(null);
             // Signing out deliberately is not an expiry — no warning belongs on
             // the login page afterwards.
             setSessionExpired(false);

@@ -1,6 +1,6 @@
 import axios, { InternalAxiosRequestConfig, AxiosError } from "axios";
 
-import { ACCESS_TOKEN_KEY } from "@/config/constants";
+import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/config/constants";
 
 // Persist access token in localStorage so it survives page reloads
 const getStoredToken = (): string | null => {
@@ -29,6 +29,21 @@ export const setAccessToken = (token: string | null) => {
 
 export const getAccessToken = (): string | null => {
     return getStoredToken();
+};
+
+// Refresh token fallback store (see REFRESH_TOKEN_KEY). Only used when the
+// httpOnly cookie is unavailable; the cookie remains the preferred path.
+export const getRefreshToken = (): string | null => {
+    if (typeof window === 'undefined') return null;
+    try { return localStorage.getItem(REFRESH_TOKEN_KEY); } catch { return null; }
+};
+
+export const setRefreshToken = (token: string | null): void => {
+    if (typeof window === 'undefined') return;
+    try {
+        if (token) localStorage.setItem(REFRESH_TOKEN_KEY, token);
+        else localStorage.removeItem(REFRESH_TOKEN_KEY);
+    } catch { /* private mode / blocked storage — cookie path still applies */ }
 };
 
 // Decode JWT exp claim without verifying signature (client-side only)
@@ -100,6 +115,7 @@ const notifySessionExpired = (reason: SessionEndReason = 'expired') => {
     if (!hasHadSession) return;
     sessionIsOver = true;
     setStoredToken(null);
+    setRefreshToken(null);
     sessionExpiredHandlers.forEach((handler) => {
         try { handler(reason); } catch { /* a bad subscriber must not break the rest */ }
     });
@@ -149,7 +165,10 @@ async function doRefresh(): Promise<string> {
     try {
         response = await axios.post(
             `${api.defaults.baseURL}/api/auth/refresh`,
-            {},
+            // Send the stored refresh token as a fallback for when the httpOnly
+            // cookie is dropped (cross-site third-party cookie). Harmless when the
+            // cookie works — the server prefers the cookie.
+            { refreshToken: getRefreshToken() || undefined },
             { withCredentials: true }
         );
     } catch (err) {

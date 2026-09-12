@@ -4,6 +4,10 @@
  */
 
 export const ACCESS_TOKEN_KEY = 'access_token';
+// Fallback store for the refresh token, used when the httpOnly cookie can't be
+// relied on (the API is on a different site, so the cookie is third-party and
+// the browser may drop it). Sent in the refresh request body.
+export const REFRESH_TOKEN_KEY = 'refresh_token';
 
 // ─── Session timeout ──────────────────────────────────────────────────────────
 //
