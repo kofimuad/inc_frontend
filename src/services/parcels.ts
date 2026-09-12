@@ -129,6 +129,29 @@ export async function uploadSheet(file: File): Promise<UploadResult> {
   return data.data;
 }
 
+export interface SourceFileRow {
+  fileHash: string;
+  stage: Stage;
+  originalFilename?: string | null;
+  uploadedAt?: string;
+  rowCount?: number;
+  skippedRows?: number[];
+  status: "active" | "reverted";
+  metadata?: Record<string, unknown>;
+}
+
+/** List uploaded sheets (batches), newest first. Pass status:'' to include reverted ones. */
+export async function listUploads(params: { stage?: Stage; status?: string } = {}): Promise<{ total: number; files: SourceFileRow[] }> {
+  const { data } = await api.get("/api/v2/uploads", { params });
+  return data.data;
+}
+
+/** Revert an upload — deactivates its rows and re-derives the affected parcels. */
+export async function revertUpload(fileHash: string): Promise<{ reverted: string; parcelsWritten: number; parcelsRemoved: number }> {
+  const { data } = await api.delete(`/api/v2/uploads/${encodeURIComponent(fileHash)}`);
+  return data.data;
+}
+
 export interface ParcelAdjustment {
   customerPhone?: string;
   statusOverride?: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Search, LayoutGrid, Container as ContainerIcon, PackageSearch, FlaskConical, UploadCloud } from "lucide-react";
+import { Search, LayoutGrid, Container as ContainerIcon, PackageSearch, FlaskConical, UploadCloud, History } from "lucide-react";
 import { useParcels } from "@/hooks/useParcels";
 import type { Parcel } from "@/services/parcels";
 import ReconciliationRibbon, { type RibbonKey } from "./ReconciliationRibbon";
@@ -9,9 +9,10 @@ import PipelineBoard from "./PipelineBoard";
 import ContainersView from "./ContainersView";
 import ParcelJourney from "./ParcelJourney";
 import UploadSheetModal from "./UploadSheetModal";
+import UploadsView from "./UploadsView";
 import { customerLabel } from "./parcelUi";
 
-type Tab = "pipeline" | "containers";
+type Tab = "pipeline" | "containers" | "uploads";
 
 const BUCKET_PREDICATE: Record<RibbonKey, (p: Parcel) => boolean> = {
   all:                   () => true,
@@ -75,19 +76,24 @@ export default function ParcelWorkspace() {
         <div className="inline-flex bg-slate-100 rounded-xl p-1">
           <TabButton icon={LayoutGrid} label="Pipeline" active={tab === "pipeline"} onClick={() => setTab("pipeline")} />
           <TabButton icon={ContainerIcon} label="Containers" active={tab === "containers"} onClick={() => setTab("containers")} />
+          <TabButton icon={History} label="Uploads" active={tab === "uploads"} onClick={() => setTab("uploads")} />
         </div>
-        <div className="relative flex-1 min-w-[220px] max-w-sm">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search tracking no., customer, phone…"
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-          />
-        </div>
+        {tab === "pipeline" && (
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search tracking no., customer, phone…"
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            />
+          </div>
+        )}
       </div>
 
-      {loading ? (
+      {tab === "uploads" ? (
+        <UploadsView onChanged={reload} />
+      ) : loading ? (
         <div className="flex items-center justify-center py-24 text-slate-400 gap-2">
           <PackageSearch className="animate-pulse" /> Loading parcels…
         </div>
