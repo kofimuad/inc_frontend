@@ -28,11 +28,10 @@ export default function Header() {
 
     const isDashboard = pathname?.startsWith('/dashboard');
 
-    const dashboardHref = user?.role === "admin"
-        ? "/dashboard/admin"
-        : user?.role === "employee"
-            ? "/dashboard/employee"
-            : "/dashboard/customer";
+    // Staff (admin + employee) now work from the unified Parcel Console.
+    const dashboardHref = (user?.role === "admin" || user?.role === "employee")
+        ? "/parcels"
+        : "/dashboard/customer";
 
     useEffect(() => {
         // Load ticker items from server settings on mount and whenever the

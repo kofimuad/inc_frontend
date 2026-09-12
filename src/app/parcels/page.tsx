@@ -1,6 +1,6 @@
-import Link from "next/link";
 import ParcelWorkspace from "@/components/parcels/ParcelWorkspace";
 import ProtectedRoute from "@/components/common/ProtectedRoute";
+import ConsoleUserMenu from "@/components/parcels/ConsoleUserMenu";
 
 export const metadata = {
   title: "Parcel Tracking · Clinette Shipping",
@@ -24,7 +24,7 @@ export default function ParcelsPage() {
             </span>
             <span className="text-slate-200">|</span>
             <span className="font-bold text-slate-500 text-sm">Parcel Console</span>
-            <Link href="/dashboard/employee" className="ml-auto text-sm font-semibold text-slate-400 hover:text-primary">← Dashboard</Link>
+            <ConsoleUserMenu />
           </div>
         </div>
         <ParcelWorkspace />

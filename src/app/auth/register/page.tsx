@@ -28,8 +28,7 @@ export default function RegisterPage() {
     useEffect(() => {
         if (isAuthenticated && user) {
             const role = user.role?.toLowerCase();
-            if (role === 'admin') router.push('/dashboard/admin');
-            else if (role === 'employee') router.push('/dashboard/employee');
+            if (role === 'admin' || role === 'employee') router.push('/parcels');
             else router.push('/dashboard/customer');
         }
     }, [isAuthenticated, user, router]);
