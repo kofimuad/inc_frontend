@@ -1,14 +1,33 @@
 "use client";
 
-import React from "react";
-import { X, Phone, Tag, MapPin, Box, AlertTriangle } from "lucide-react";
+import React, { useState } from "react";
+import { X, Phone, Tag, MapPin, Box, AlertTriangle, Save, PauseCircle, Loader2 } from "lucide-react";
 import type { Parcel } from "@/services/parcels";
+import { adjustParcel } from "@/services/parcels";
 import { STAGE_ORDER, STAGE_META, stageRank, fmtDate, customerLabel } from "./parcelUi";
 
 /** Slide-over showing one tracking number's journey through the pipeline. */
-export default function ParcelJourney({ parcel, onClose }: { parcel: Parcel | null; onClose: () => void }) {
+export default function ParcelJourney({ parcel, onClose, onChanged }: { parcel: Parcel | null; onClose: () => void; onChanged?: () => void }) {
+  const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+
   if (!parcel) return null;
   const reached = stageRank(parcel.currentStage);
+
+  const savePhone = async () => {
+    if (!phone.trim()) return;
+    setBusy("phone");
+    try { await adjustParcel(parcel.waybill, parcel.customerKey, { customerPhone: phone.trim() }); setSaved("Phone saved"); onChanged?.(); }
+    catch { setSaved("Could not save — try again"); }
+    finally { setBusy(null); }
+  };
+  const putOnHold = async () => {
+    setBusy("hold");
+    try { await adjustParcel(parcel.waybill, parcel.customerKey, { statusOverride: "held", heldReason: "Placed on hold by staff" }); setSaved("Parcel held"); onChanged?.(); }
+    catch { setSaved("Could not update — try again"); }
+    finally { setBusy(null); }
+  };
 
   const stageDetail = (stage: (typeof STAGE_ORDER)[number]) => {
     if (stage === "intake" && parcel.intake)
@@ -95,6 +114,34 @@ export default function ParcelJourney({ parcel, onClose }: { parcel: Parcel | nu
               <p className="mt-1 text-sm text-slate-700 font-medium">{parcel.productDescription}</p>
             </div>
           )}
+
+          {/* Staff actions — recorded as manual adjustments; survive re-derivation. */}
+          <div className="mt-6 bg-white rounded-xl border border-slate-100 p-4">
+            <p className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-3">Staff actions</p>
+            {parcel.flags.needsPhone && (
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  value={phone} onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Add phone number"
+                  className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+                <button
+                  onClick={savePhone} disabled={busy === "phone" || !phone.trim()}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-white text-sm font-bold disabled:opacity-40"
+                >
+                  {busy === "phone" ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save
+                </button>
+              </div>
+            )}
+            <button
+              onClick={putOnHold} disabled={busy === "hold" || parcel.status === "held"}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm font-semibold hover:border-amber-300 hover:text-amber-700 disabled:opacity-40"
+            >
+              {busy === "hold" ? <Loader2 size={14} className="animate-spin" /> : <PauseCircle size={14} />}
+              {parcel.status === "held" ? "On hold" : "Put on hold"}
+            </button>
+            {saved && <p className="mt-2 text-xs text-emerald-600 font-semibold">{saved}</p>}
+          </div>
         </div>
       </div>
     </div>
