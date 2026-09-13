@@ -1,5 +1,19 @@
 import { Warehouse, Ship, PackageCheck, type LucideIcon } from "lucide-react";
-import type { Parcel, Stage } from "@/services/parcels";
+import type { Parcel, Stage, ParcelStatus } from "@/services/parcels";
+
+/** The manual status lifecycle, in order, with display label and badge colour. */
+export const STATUS_ORDER: ParcelStatus[] = ["received", "loaded", "shipped", "at_port", "ready_for_pickup", "delivered"];
+export const STATUS_META: Record<string, { label: string; cls: string }> = {
+  received:         { label: "Received",         cls: "bg-amber-50 text-amber-700 ring-amber-200" },
+  loaded:           { label: "Loaded",           cls: "bg-orange-50 text-orange-700 ring-orange-200" },
+  shipped:          { label: "Shipped",          cls: "bg-sky-50 text-sky-700 ring-sky-200" },
+  at_port:          { label: "At Tema Port",     cls: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
+  ready_for_pickup: { label: "Ready for pickup", cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+  delivered:        { label: "Delivered",        cls: "bg-green-50 text-green-700 ring-green-200" },
+};
+export function statusLabel(s?: string | null): string {
+  return (s && STATUS_META[s]?.label) || (s ? s.replace(/_/g, " ") : "—");
+}
 
 /** Visual identity for each stage of the pipeline. */
 export const STAGE_META: Record<Stage, {

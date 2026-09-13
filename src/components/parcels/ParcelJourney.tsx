@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { X, Phone, Tag, MapPin, Box, AlertTriangle, Save, PauseCircle, Loader2 } from "lucide-react";
 import type { Parcel } from "@/services/parcels";
 import { adjustParcel } from "@/services/parcels";
-import { STAGE_ORDER, STAGE_META, stageRank, fmtDate, customerLabel } from "./parcelUi";
+import { STAGE_ORDER, STAGE_META, STATUS_ORDER, statusLabel, stageRank, fmtDate, customerLabel } from "./parcelUi";
 
 /** Slide-over showing one tracking number's journey through the pipeline. */
 export default function ParcelJourney({ parcel, onClose, onChanged }: { parcel: Parcel | null; onClose: () => void; onChanged?: () => void }) {
@@ -20,6 +20,12 @@ export default function ParcelJourney({ parcel, onClose, onChanged }: { parcel: 
     setBusy("phone");
     try { await adjustParcel(parcel.waybill, parcel.customerKey, { customerPhone: phone.trim() }); setSaved("Phone saved"); onChanged?.(); }
     catch { setSaved("Could not save — try again"); }
+    finally { setBusy(null); }
+  };
+  const setStatus = async (status: string) => {
+    setBusy("status");
+    try { await adjustParcel(parcel.waybill, parcel.customerKey, { statusOverride: status }); setSaved("Status updated — the customer sees this."); onChanged?.(); }
+    catch { setSaved("Could not update status — try again"); }
     finally { setBusy(null); }
   };
   const putOnHold = async () => {
@@ -118,6 +124,18 @@ export default function ParcelJourney({ parcel, onClose, onChanged }: { parcel: 
           {/* Staff actions — recorded as manual adjustments; survive re-derivation. */}
           <div className="mt-6 bg-white rounded-xl border border-slate-100 p-4">
             <p className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-3">Staff actions</p>
+            <div className="mb-3">
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Status</label>
+              <select
+                value={STATUS_ORDER.includes(parcel.status as never) ? parcel.status : ""}
+                onChange={(e) => setStatus(e.target.value)}
+                disabled={busy === "status"}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50"
+              >
+                {!STATUS_ORDER.includes(parcel.status as never) && <option value="">{statusLabel(parcel.status)}</option>}
+                {STATUS_ORDER.map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
+              </select>
+            </div>
             {parcel.flags.needsPhone && (
               <div className="flex items-center gap-2 mb-3">
                 <input

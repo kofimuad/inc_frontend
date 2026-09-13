@@ -38,9 +38,20 @@ function parcelToShipment(p: any) {
         containerNo:       container,
         intakeDate:        p.intake?.date ?? p.receivedDate ?? null,
         receivingDate:     p.loading?.loadingDate ?? null,
+        loadingDate:       p.loading?.loadingDate ?? null,
         estimatedDelivery: p.loading?.eta ?? null,
         arrivalDate:       p.arrival?.date ?? null,
         timeline:          synthTimeline(p),
+        // Nested shapes the public tracking table reads (dates.* / cargo.*).
+        dates: {
+            intakeDate: p.intake?.date ?? p.receivedDate ?? null,
+            shippedAt:  p.loading?.loadingDate ?? null,
+            arrivedAt:  p.arrival?.date ?? null,
+        },
+        cargo: {
+            cbm:         p.cbm ?? p.loading?.cbm ?? null,
+            description: p.productDescription ?? null,
+        },
     };
 }
 
