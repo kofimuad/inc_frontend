@@ -3,7 +3,7 @@
 import React from "react";
 import { Phone, Tag, Box } from "lucide-react";
 import type { Parcel } from "@/services/parcels";
-import { STAGE_ORDER, STAGE_META, stageRank, fmtDay, daysWaiting, customerLabel, alertOf } from "./parcelUi";
+import { STAGE_ORDER, STAGE_META, STATUS_META, statusLabel, stageRank, fmtDay, daysWaiting, customerLabel, alertOf } from "./parcelUi";
 
 /** The three-node stage tracker shown on every parcel card. */
 export function StageTracker({ parcel, size = "sm" }: { parcel: Parcel; size?: "sm" | "md" }) {
@@ -58,11 +58,16 @@ export default function ParcelCard({ parcel, onOpen }: { parcel: Parcel; onOpen?
         )}
       </div>
 
-      {alert && (
-        <div className={`mt-2 inline-flex items-center text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ring-1 ${alert.className}`}>
-          {alert.label}
-        </div>
-      )}
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ring-1 ${STATUS_META[parcel.status]?.cls || "bg-slate-50 text-slate-600 ring-slate-200"}`}>
+          {statusLabel(parcel.status)}
+        </span>
+        {alert && (
+          <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ring-1 ${alert.className}`}>
+            {alert.label}
+          </span>
+        )}
+      </div>
     </button>
   );
 }

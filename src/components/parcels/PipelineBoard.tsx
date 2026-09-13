@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import type { Parcel, Stage } from "@/services/parcels";
-import { STAGE_ORDER, STAGE_META, fmtDay } from "./parcelUi";
+import { bulkSetStatus, type ParcelStatus } from "@/services/parcels";
+import { STAGE_ORDER, STAGE_META, STATUS_ORDER, statusLabel, fmtDay } from "./parcelUi";
 import ParcelCard from "./ParcelCard";
 
 export type GroupBy = "none" | "container" | "date";
@@ -28,12 +29,23 @@ function groupOf(p: Parcel, by: GroupBy): { key: string; label: string; sort: st
  * receiving date) so a new upload doesn't blend into the pile.
  */
 export default function PipelineBoard({
-  parcels, onOpen, groupBy = "none",
-}: { parcels: Parcel[]; onOpen?: (p: Parcel) => void; groupBy?: GroupBy }) {
+  parcels, onOpen, groupBy = "none", onChanged,
+}: { parcels: Parcel[]; onOpen?: (p: Parcel) => void; groupBy?: GroupBy; onChanged?: () => void }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [busyGroup, setBusyGroup] = useState<string | null>(null);
   const toggle = (id: string) => setCollapsed((s) => {
     const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n;
   });
+
+  const applyGroupStatus = async (id: string, items: Parcel[], status: ParcelStatus) => {
+    setBusyGroup(id);
+    try {
+      await bulkSetStatus(items.map((p) => ({ waybill: p.waybill, customerKey: p.customerKey })), status);
+      onChanged?.();
+    } finally {
+      setBusyGroup(null);
+    }
+  };
 
   const columns: Record<Stage, Parcel[]> = { intake: [], loading: [], arrival: [] };
   for (const p of parcels) columns[p.currentStage].push(p);
@@ -78,16 +90,26 @@ export default function PipelineBoard({
                     const isCollapsed = collapsed.has(id);
                     return (
                       <div key={id} className="space-y-2">
-                        <button
-                          onClick={() => toggle(id)}
-                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/70 ${meta.text} ring-1 ${meta.ring} text-[11px] font-bold`}
-                        >
-                          <span className="flex items-center gap-1 truncate">
+                        <div className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/70 ${meta.text} ring-1 ${meta.ring} text-[11px] font-bold`}>
+                          <button onClick={() => toggle(id)} className="flex items-center gap-1 truncate flex-1 text-left">
                             {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
                             <span className="truncate">{g.label}</span>
-                          </span>
-                          <span>{g.items.length}</span>
-                        </button>
+                            <span className="ml-1 opacity-70">· {g.items.length}</span>
+                          </button>
+                          {busyGroup === id ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <select
+                              title="Set status for this whole group"
+                              value=""
+                              onChange={(e) => { if (e.target.value) applyGroupStatus(id, g.items, e.target.value as ParcelStatus); }}
+                              className="text-[11px] font-semibold bg-transparent border border-current/30 rounded px-1 py-0.5 cursor-pointer focus:outline-none"
+                            >
+                              <option value="">Set status…</option>
+                              {STATUS_ORDER.map((s) => <option key={s} value={s} className="text-slate-700">{statusLabel(s)}</option>)}
+                            </select>
+                          )}
+                        </div>
                         {!isCollapsed && g.items.map((p) => (
                           <ParcelCard key={(p._id || p.waybill) + p.customerKey} parcel={p} onOpen={onOpen} />
                         ))}

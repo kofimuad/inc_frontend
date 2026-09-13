@@ -7,6 +7,7 @@ import api from "./api";
  */
 
 export type Stage = "intake" | "loading" | "arrival";
+export type ParcelStatus = "received" | "loaded" | "shipped" | "at_port" | "ready_for_pickup" | "delivered";
 
 export interface ParcelIntake  { date?: string; warehouse?: string | null; qty?: number | null; qtyRaw?: string | null; }
 export interface ParcelLoading { containerNo?: string | null; batchRef?: string | null; loadingDate?: string | null; etd?: string | null; eta?: string | null; cbm?: number | null; location?: string | null; qty?: number | null; }
@@ -166,4 +167,13 @@ export async function adjustParcel(waybill: string, customerKey: string, body: P
     body
   );
   return data.data?.parcel ?? null;
+}
+
+/** Set one status on many parcels at once (a whole group). */
+export async function bulkSetStatus(
+  items: { waybill: string; customerKey: string }[],
+  status: ParcelStatus,
+): Promise<{ updated: number; waybills: number }> {
+  const { data } = await api.post("/api/v2/parcels/bulk-status", { items, status });
+  return data.data;
 }

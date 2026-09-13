@@ -60,6 +60,9 @@ export const STATUS_LABELS: Record<string, string> = {
     [SHIPMENT_STATUSES.AT_PORT]: 'At Tema Port',
     [SHIPMENT_STATUSES.READY_FOR_PICKUP]: 'Ready for Pickup',
     [SHIPMENT_STATUSES.HELD]: 'On Hold',
+    // Manual status lifecycle (v2) — at_port / ready_for_pickup already covered above
+    received: 'Received',
+    loaded: 'Loaded',
 };
 
 export const STATUS_COLORS: Record<string, string> = {
@@ -76,6 +79,8 @@ export const STATUS_COLORS: Record<string, string> = {
     [SHIPMENT_STATUSES.AT_PORT]: 'bg-orange-100 text-orange-700',
     [SHIPMENT_STATUSES.READY_FOR_PICKUP]: 'bg-emerald-100 text-emerald-700',
     [SHIPMENT_STATUSES.HELD]: 'bg-teal-100 text-teal-700',
+    received: 'bg-amber-100 text-amber-700',
+    loaded: 'bg-orange-100 text-orange-700',
     default: 'bg-slate-100 text-slate-700',
 };
 

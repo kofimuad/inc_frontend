@@ -135,7 +135,7 @@ export default function ParcelWorkspace() {
       ) : tab === "pipeline" ? (
         <>
           <p className="text-xs text-slate-400 font-medium">{filtered.length} parcels shown</p>
-          <PipelineBoard parcels={filtered} onOpen={setSelected} groupBy={groupBy} />
+          <PipelineBoard parcels={filtered} onOpen={setSelected} groupBy={groupBy} onChanged={reload} />
         </>
       ) : (
         <ContainersView containers={containers} parcels={parcels} onOpen={setSelected} />
