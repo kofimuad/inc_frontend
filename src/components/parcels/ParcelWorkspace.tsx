@@ -138,7 +138,7 @@ export default function ParcelWorkspace() {
           <PipelineBoard parcels={filtered} onOpen={setSelected} groupBy={groupBy} onChanged={reload} />
         </>
       ) : (
-        <ContainersView containers={containers} parcels={parcels} onOpen={setSelected} />
+        <ContainersView containers={containers} onOpen={setSelected} />
       )}
 
       <ParcelJourney parcel={selected} onClose={() => setSelected(null)} onChanged={reload} />
