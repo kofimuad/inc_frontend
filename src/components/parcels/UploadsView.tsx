@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { Undo2, Loader2, FileSpreadsheet, RefreshCw } from "lucide-react";
+import { Undo2, Loader2, FileSpreadsheet, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { listUploads, revertUpload, type SourceFileRow } from "@/services/parcels";
 import { STAGE_META, fmtDate } from "./parcelUi";
 
@@ -11,28 +11,33 @@ import { STAGE_META, fmtDate } from "./parcelUi";
  * affected parcels — no data is lost).
  */
 export default function UploadsView({ onChanged }: { onChanged?: () => void }) {
+  const PAGE_SIZE = 25;
   const [files, setFiles] = useState<SourceFileRow[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [reverting, setReverting] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(() => {
+  const load = useCallback((p: number) => {
     setLoading(true);
     // status:'' → include reverted ones too, so the history is visible.
-    listUploads({ status: "" })
-      .then((d) => { setFiles(d.files || []); setError(null); })
+    listUploads({ status: "", page: p, limit: PAGE_SIZE })
+      .then((d) => { setFiles(d.files || []); setTotal(d.total || 0); setError(null); })
       .catch(() => setError("Couldn't load uploads."))
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(load, [load]);
+  useEffect(() => { load(page); }, [load, page]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const doRevert = async (hash: string) => {
     setReverting(hash); setConfirming(null);
     try {
       await revertUpload(hash);
-      load();
+      load(page);
       onChanged?.();
     } catch {
       setError("Revert failed — try again.");
@@ -50,9 +55,9 @@ export default function UploadsView({ onChanged }: { onChanged?: () => void }) {
       <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
         <div>
           <h3 className="font-bold text-slate-800">Uploads</h3>
-          <p className="text-xs text-slate-400 font-medium mt-0.5">Each sheet you upload is one batch. Revert to undo a wrong file.</p>
+          <p className="text-xs text-slate-400 font-medium mt-0.5">Each sheet you upload is one batch. Revert to undo a wrong file. {total} total.</p>
         </div>
-        <button onClick={load} className="p-2 rounded-lg text-slate-400 hover:text-primary hover:bg-slate-50" title="Refresh"><RefreshCw size={16} /></button>
+        <button onClick={() => load(page)} className="p-2 rounded-lg text-slate-400 hover:text-primary hover:bg-slate-50" title="Refresh"><RefreshCw size={16} /></button>
       </div>
 
       {error && <div className="px-5 py-3 text-sm text-rose-600 bg-rose-50">{error}</div>}
@@ -119,6 +124,28 @@ export default function UploadsView({ onChanged }: { onChanged?: () => void }) {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
+          <span className="text-xs text-slate-400 font-medium">Page {page} of {totalPages}</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:border-primary/40 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={14} /> Prev
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:border-primary/40 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next <ChevronRight size={14} />
+            </button>
+          </div>
         </div>
       )}
     </div>
