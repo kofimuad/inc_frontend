@@ -142,7 +142,7 @@ export interface SourceFileRow {
 }
 
 /** List uploaded sheets (batches), newest first. Pass status:'' to include reverted ones. */
-export async function listUploads(params: { stage?: Stage; status?: string } = {}): Promise<{ total: number; files: SourceFileRow[] }> {
+export async function listUploads(params: { stage?: Stage; status?: string; page?: number; limit?: number } = {}): Promise<{ total: number; page: number; files: SourceFileRow[] }> {
   const { data } = await api.get("/api/v2/uploads", { params });
   return data.data;
 }
