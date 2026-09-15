@@ -18,11 +18,22 @@ const publicApi = axios.create({
 function synthTimeline(p: any) {
     const t: any[] = [];
     if (p.intake)  t.push({ status: 'in_warehouse', timestamp: p.intake.date,  location: p.intake.warehouse,   note: 'Received at the warehouse' });
-    if (p.loading) t.push({ status: 'shipped',      timestamp: p.loading.loadingDate, location: p.loading.containerNo, note: 'Loaded into container' });
-    if (p.arrival) t.push({ status: 'arrived',      timestamp: p.arrival.date,  location: p.arrival.containerNo, note: 'Arrived at the port' });
+    const legs: any[] = p.loading?.legs || [];
+    if (legs.length > 1) {
+        // A shipment split across containers: one loaded/arrived entry per leg,
+        // each with its own state, so the customer sees every container.
+        for (const l of legs) {
+            t.push({ status: 'shipped', timestamp: l.loadingDate, location: l.containerNo, note: `Loaded into container ${l.containerNo || ''}`.trim() });
+            if (l.arrived) t.push({ status: 'arrived', timestamp: null, location: l.containerNo, note: `Container ${l.containerNo || ''} arrived at the port`.trim() });
+        }
+    } else {
+        if (p.loading) t.push({ status: 'shipped', timestamp: p.loading.loadingDate, location: p.loading.containerNo, note: 'Loaded into container' });
+        if (p.arrival) t.push({ status: 'arrived', timestamp: p.arrival.date,  location: p.arrival.containerNo, note: 'Arrived at the port' });
+    }
     return t;
 }
 function parcelToShipment(p: any) {
+    const legs: any[] = p.loading?.legs || [];
     const container = p.loading?.containerNo ?? p.arrival?.containerNo ?? null;
     return {
         _id:               `${p.waybill}|${p.currentStage || ''}`,
@@ -33,9 +44,14 @@ function parcelToShipment(p: any) {
         destinationCity:   p.loading?.location ?? null,
         productDescription: p.productDescription ?? null,
         quantity:          p.qty ?? null,
+        qtyByUnit:         p.qtyByUnit ?? null,
         cbm:               p.cbm ?? p.loading?.cbm ?? null,
         containerRef:      container,
         containerNo:       container,
+        // Every container this shipment is split across, each with its own
+        // arrival state (empty / single-element for an unsplit shipment).
+        containers:        legs.map((l) => ({ containerNo: l.containerNo, loadingDate: l.loadingDate, eta: l.eta, qty: l.qty, arrived: !!l.arrived })),
+        partiallyArrived:  !!p.partiallyArrived,
         intakeDate:        p.intake?.date ?? p.receivedDate ?? null,
         receivingDate:     p.loading?.loadingDate ?? null,
         loadingDate:       p.loading?.loadingDate ?? null,

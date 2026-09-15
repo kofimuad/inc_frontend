@@ -3,7 +3,7 @@
 import React from "react";
 import { Phone, Tag, Box } from "lucide-react";
 import type { Parcel } from "@/services/parcels";
-import { STAGE_ORDER, STAGE_META, STATUS_META, statusLabel, stageRank, fmtDay, daysWaiting, customerLabel, alertOf } from "./parcelUi";
+import { STAGE_ORDER, STAGE_META, STATUS_META, statusLabel, stageRank, fmtDay, daysWaiting, customerLabel, alertOf, qtyLabel, containerCount } from "./parcelUi";
 
 /** The three-node stage tracker shown on every parcel card. */
 export function StageTracker({ parcel, size = "sm" }: { parcel: Parcel; size?: "sm" | "md" }) {
@@ -30,6 +30,9 @@ export function StageTracker({ parcel, size = "sm" }: { parcel: Parcel; size?: "
 export default function ParcelCard({ parcel, onOpen }: { parcel: Parcel; onOpen?: (p: Parcel) => void }) {
   const alert = alertOf(parcel);
   const waited = daysWaiting(parcel);
+  const qty = qtyLabel(parcel);
+  const containers = containerCount(parcel);
+  const receipts = parcel.intake?.lines?.length ?? 0;
   return (
     <button
       onClick={() => onOpen?.(parcel)}
@@ -50,9 +53,11 @@ export default function ParcelCard({ parcel, onOpen }: { parcel: Parcel; onOpen?
       </div>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400 font-medium">
-        {parcel.qty != null && <span>{parcel.qty} pcs</span>}
+        {qty && <span>{qty}{receipts > 1 && <span className="text-slate-400"> · {receipts} receipts</span>}</span>}
         <span>Rec. {fmtDay(parcel.receivedDate)}</span>
-        {parcel.loading?.containerNo && <span className="font-mono">{parcel.loading.containerNo}</span>}
+        {containers > 1
+          ? <span className="font-mono">{containers} containers</span>
+          : parcel.loading?.containerNo && <span className="font-mono">{parcel.loading.containerNo}</span>}
         {waited != null && waited >= 3 && (
           <span className="text-amber-600 font-semibold">{waited}d waiting</span>
         )}
@@ -62,6 +67,11 @@ export default function ParcelCard({ parcel, onOpen }: { parcel: Parcel; onOpen?
         <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ring-1 ${STATUS_META[parcel.status]?.cls || "bg-slate-50 text-slate-600 ring-slate-200"}`}>
           {statusLabel(parcel.status)}
         </span>
+        {parcel.flags.partiallyArrived && (
+          <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ring-1 bg-teal-50 text-teal-700 ring-teal-200">
+            Partially arrived
+          </span>
+        )}
         {alert && (
           <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ring-1 ${alert.className}`}>
             {alert.label}

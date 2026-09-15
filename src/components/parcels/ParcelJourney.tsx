@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { X, Phone, Tag, MapPin, Box, AlertTriangle, Save, PauseCircle, Loader2 } from "lucide-react";
 import type { Parcel } from "@/services/parcels";
 import { adjustParcel } from "@/services/parcels";
-import { STAGE_ORDER, STAGE_META, STATUS_ORDER, statusLabel, stageRank, fmtDate, customerLabel } from "./parcelUi";
+import { STAGE_ORDER, STAGE_META, STATUS_ORDER, statusLabel, stageRank, fmtDate, fmtDay, customerLabel, qtyLabel, containerCount } from "./parcelUi";
 
 /** Slide-over showing one tracking number's journey through the pipeline. */
 export default function ParcelJourney({ parcel, onClose, onChanged }: { parcel: Parcel | null; onClose: () => void; onChanged?: () => void }) {
@@ -35,13 +35,55 @@ export default function ParcelJourney({ parcel, onClose, onChanged }: { parcel: 
     finally { setBusy(null); }
   };
 
+  const containers = containerCount(parcel);
   const stageDetail = (stage: (typeof STAGE_ORDER)[number]) => {
     if (stage === "intake" && parcel.intake)
-      return [["Received", fmtDate(parcel.intake.date)], ["Warehouse", parcel.intake.warehouse || "—"], ["Qty", parcel.intake.qty ?? "—"]];
+      return [["Received", fmtDate(parcel.intake.date)], ["Warehouse", parcel.intake.warehouse || "—"], ["Qty", qtyLabel(parcel) ?? "—"]];
     if (stage === "loading" && parcel.loading)
-      return [["Container", parcel.loading.containerNo || "—"], ["Loaded", fmtDate(parcel.loading.loadingDate)], ["ETA", parcel.loading.eta || "—"], ["CBM", parcel.loading.cbm ?? "—"]];
+      return [["Container", containers > 1 ? `${containers} containers` : (parcel.loading.containerNo || "—")], ["Loaded", fmtDate(parcel.loading.loadingDate)], ["ETA", parcel.loading.eta || "—"], ["CBM", parcel.loading.cbm ?? "—"]];
     if (stage === "arrival" && parcel.arrival)
       return [["Arrived", fmtDate(parcel.arrival.date)], ["Container", parcel.arrival.containerNo || "—"]];
+    return null;
+  };
+
+  // Per-line / per-leg breakdown shown under a stage when a tracking number
+  // carries several goods (received over multiple days, or split across
+  // containers).
+  const breakdown = (stage: (typeof STAGE_ORDER)[number]) => {
+    if (stage === "intake" && (parcel.intake?.lines?.length ?? 0) > 1) {
+      return (
+        <div className="mt-2 border-t border-slate-100 pt-2 space-y-1">
+          <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{parcel.intake!.lines!.length} receipts</p>
+          {parcel.intake!.lines!.map((l, i) => (
+            <div key={i} className="flex items-center justify-between text-xs">
+              <span className="text-slate-500">{fmtDay(l.date)}</span>
+              <span className="text-slate-700 font-semibold">{l.qtyRaw || l.qty || "—"}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    if (stage === "loading" && (parcel.loading?.legs?.length ?? 0) > 1) {
+      const legs = parcel.loading!.legs!;
+      const distinctContainers = new Set(legs.map((l) => l.containerNo).filter(Boolean)).size;
+      const header = distinctContainers > 1 ? `${distinctContainers} containers` : `${legs.length} loads`;
+      return (
+        <div className="mt-2 border-t border-slate-100 pt-2 space-y-1">
+          <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{header}</p>
+          {parcel.loading!.legs!.map((l, i) => (
+            <div key={i} className="flex items-center justify-between text-xs">
+              <span className="font-mono text-slate-600">{l.containerNo || "—"}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-slate-500">{l.qtyRaw || l.qty || "—"}</span>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${l.arrived ? "bg-emerald-50 text-emerald-700" : "bg-sky-50 text-sky-700"}`}>
+                  {l.arrived ? "Arrived" : "On the water"}
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+      );
+    }
     return null;
   };
 
@@ -71,13 +113,15 @@ export default function ParcelJourney({ parcel, onClose, onChanged }: { parcel: 
         </div>
 
         {/* flags */}
-        {(parcel.flags.loadedNeverReceived || parcel.flags.needsPhone || parcel.flags.qtyMismatch) && (
+        {(parcel.flags.loadedNeverReceived || parcel.flags.needsPhone || parcel.flags.qtyMismatch || parcel.flags.partiallyArrived || parcel.flags.mixedUnits) && (
           <div className="p-5 pb-0 space-y-2">
             {parcel.flags.loadedNeverReceived && (
               <Flag text="Loaded without an intake record — the goods-received sheet for its receiving date has not been uploaded. Received date recovered from the loading list." />
             )}
             {parcel.flags.needsPhone && <Flag text="No phone number on file — appears on the staff worklist." />}
-            {parcel.flags.qtyMismatch && <Flag text="Quantity differs between intake and loading." />}
+            {parcel.flags.qtyMismatch && <Flag text="Total quantity differs between intake and loading." />}
+            {parcel.flags.partiallyArrived && <Flag tone="info" text="Some of this shipment's containers have arrived while others are still on the water — see the containers below." />}
+            {parcel.flags.mixedUnits && <Flag tone="info" text="This shipment mixes units (e.g. pallets and loose pieces); quantities are shown per unit rather than as one total." />}
           </div>
         )}
 
@@ -108,6 +152,7 @@ export default function ParcelJourney({ parcel, onClose, onChanged }: { parcel: 
                     ) : (
                       <p className="mt-1 text-xs text-slate-400 font-medium">{on ? "—" : "Not yet reached"}</p>
                     )}
+                    {on && breakdown(stage)}
                   </div>
                 </li>
               );
@@ -166,9 +211,12 @@ export default function ParcelJourney({ parcel, onClose, onChanged }: { parcel: 
   );
 }
 
-function Flag({ text }: { text: string }) {
+function Flag({ text, tone = "warn" }: { text: string; tone?: "warn" | "info" }) {
+  const cls = tone === "info"
+    ? "bg-teal-50 text-teal-800 ring-teal-200"
+    : "bg-rose-50 text-rose-700 ring-rose-200";
   return (
-    <div className="flex items-start gap-2 bg-rose-50 text-rose-700 rounded-xl p-3 ring-1 ring-rose-200">
+    <div className={`flex items-start gap-2 rounded-xl p-3 ring-1 ${cls}`}>
       <AlertTriangle size={15} className="shrink-0 mt-0.5" />
       <p className="text-xs font-medium leading-relaxed">{text}</p>
     </div>
