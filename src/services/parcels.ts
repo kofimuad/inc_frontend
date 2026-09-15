@@ -9,8 +9,13 @@ import api from "./api";
 export type Stage = "intake" | "loading" | "arrival";
 export type ParcelStatus = "received" | "loaded" | "shipped" | "at_port" | "ready_for_pickup" | "delivered";
 
-export interface ParcelIntake  { date?: string; warehouse?: string | null; qty?: number | null; qtyRaw?: string | null; }
-export interface ParcelLoading { containerNo?: string | null; batchRef?: string | null; loadingDate?: string | null; etd?: string | null; eta?: string | null; cbm?: number | null; location?: string | null; qty?: number | null; }
+/** One physical receipt on an intake sheet (a waybill can have several). */
+export interface IntakeLine { date?: string | null; qty?: number | null; qtyRaw?: string | null; qtyUnit?: string | null; warehouse?: string | null; srcRow?: number; fileHash?: string; }
+/** One container leg on a loading sheet, with its own arrival state. */
+export interface LoadingLeg { containerNo?: string | null; batchRef?: string | null; loadingDate?: string | null; etd?: string | null; eta?: string | null; cbm?: number | null; qty?: number | null; qtyRaw?: string | null; qtyUnit?: string | null; arrived?: boolean; srcRow?: number; fileHash?: string; }
+
+export interface ParcelIntake  { date?: string; warehouse?: string | null; qty?: number | null; qtyRaw?: string | null; lines?: IntakeLine[]; }
+export interface ParcelLoading { containerNo?: string | null; batchRef?: string | null; loadingDate?: string | null; etd?: string | null; eta?: string | null; cbm?: number | null; location?: string | null; qty?: number | null; legs?: LoadingLeg[]; }
 export interface ParcelArrival { date?: string | null; containerNo?: string | null; }
 
 export interface ParcelFlags {
@@ -19,6 +24,10 @@ export interface ParcelFlags {
   loadedNeverReceived: boolean;
   qtyMismatch: boolean;
   needsWaybill?: boolean;
+  multiIntake?: boolean;
+  multiContainer?: boolean;
+  mixedUnits?: boolean;
+  partiallyArrived?: boolean;
 }
 
 export interface Parcel {
@@ -35,6 +44,8 @@ export interface Parcel {
   loading: ParcelLoading | null;
   arrival: ParcelArrival | null;
   qty?: number | null;
+  qtyByUnit?: Record<string, number> | null;
+  containerNos?: string[];
   productDescription?: string | null;
   flags: ParcelFlags;
   observationRefs?: { fileHash: string; srcRow: number; tokenIndex: number; stage: Stage }[];

@@ -57,6 +57,21 @@ export function customerLabel(p: Parcel): string {
   return p.customerName || p.shippingMark || p.customerPhone || "Unidentified";
 }
 
+/** Human quantity, unit-aware: "3 pallet + 4 pieces" when mixed, else "7 pcs". */
+export function qtyLabel(p: Parcel): string | null {
+  if (p.qtyByUnit && Object.keys(p.qtyByUnit).length) {
+    return Object.entries(p.qtyByUnit).map(([u, n]) => `${n} ${u}`).join(" + ");
+  }
+  if (p.qty != null) return `${p.qty} pcs`;
+  return null;
+}
+
+/** How many containers a parcel is split across (0/1 = not split). */
+export function containerCount(p: Parcel): number {
+  if (p.containerNos && p.containerNos.length) return p.containerNos.length;
+  return p.loading?.legs?.length ?? (p.loading?.containerNo ? 1 : 0);
+}
+
 /** The most pressing exception flag on a parcel, for a badge. */
 export function alertOf(p: Parcel): { label: string; className: string } | null {
   if (p.flags.loadedNeverReceived) return { label: "No intake record", className: "bg-rose-50 text-rose-600 ring-rose-200" };
