@@ -72,6 +72,11 @@ export default function ParcelCard({ parcel, onOpen }: { parcel: Parcel; onOpen?
             Partially arrived
           </span>
         )}
+        {parcel.flags.partiallyLoaded && (
+          <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ring-1 bg-amber-50 text-amber-700 ring-amber-200">
+            Partly loaded
+          </span>
+        )}
         {alert && (
           <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ring-1 ${alert.className}`}>
             {alert.label}

@@ -28,6 +28,7 @@ export interface ParcelFlags {
   multiContainer?: boolean;
   mixedUnits?: boolean;
   partiallyArrived?: boolean;
+  partiallyLoaded?: boolean;
 }
 
 export interface Parcel {
