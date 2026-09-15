@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Search, LayoutGrid, Container as ContainerIcon, PackageSearch, FlaskConical, UploadCloud, History } from "lucide-react";
 import { useParcels } from "@/hooks/useParcels";
-import type { Parcel } from "@/services/parcels";
+import { useDebounce } from "@/hooks/useDebounce";
+import { listParcels, type Parcel, type ParcelBucket } from "@/services/parcels";
 import ReconciliationRibbon, { type RibbonKey } from "./ReconciliationRibbon";
 import PipelineBoard, { type GroupBy } from "./PipelineBoard";
 import ContainersView from "./ContainersView";
@@ -32,6 +33,30 @@ export default function ParcelWorkspace() {
   const [showUpload, setShowUpload] = useState(false);
   const [groupBy, setGroupBy] = useState<GroupBy>("container");
   const [batch, setBatch] = useState<string>("all");
+
+  // Server-side search: the board only holds the newest slice of parcels, so a
+  // typed query is sent to the API to search ALL parcels, not just the loaded set.
+  const debouncedQuery = useDebounce(query, 350);
+  const isSearch = debouncedQuery.trim().length > 0;
+  const [serverResults, setServerResults] = useState<Parcel[] | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const q = debouncedQuery.trim();
+    if (!q) { setServerResults(null); setSearching(false); return; }
+    let cancelled = false;
+    setSearching(true);
+    listParcels({
+      search: q,
+      bucket: bucket !== "all" ? (bucket as ParcelBucket) : undefined,
+      container: batch !== "all" ? batch : undefined,
+      limit: 300,
+    })
+      .then((r) => { if (!cancelled) setServerResults(r.parcels || []); })
+      .catch(() => { if (!cancelled) setServerResults([]); })
+      .finally(() => { if (!cancelled) setSearching(false); });
+    return () => { cancelled = true; };
+  }, [debouncedQuery, bucket, batch]);
 
   // Container batches present in the data, newest first, for the batch filter.
   const batchOptions = useMemo(
@@ -133,10 +158,25 @@ export default function ParcelWorkspace() {
           <PackageSearch className="animate-pulse" /> Loading parcels…
         </div>
       ) : tab === "pipeline" ? (
-        <>
-          <p className="text-xs text-slate-400 font-medium">{filtered.length} parcels shown</p>
-          <PipelineBoard parcels={filtered} onOpen={setSelected} groupBy={groupBy} onChanged={reload} />
-        </>
+        isSearch ? (
+          searching && serverResults === null ? (
+            <div className="flex items-center justify-center py-24 text-slate-400 gap-2">
+              <PackageSearch className="animate-pulse" /> Searching all parcels…
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-slate-400 font-medium">
+                {(serverResults || []).length}{(serverResults || []).length === 300 ? "+" : ""} result(s) for &ldquo;{debouncedQuery.trim()}&rdquo; (searched all parcels)
+              </p>
+              <PipelineBoard parcels={serverResults || []} onOpen={setSelected} groupBy={groupBy} onChanged={reload} />
+            </>
+          )
+        ) : (
+          <>
+            <p className="text-xs text-slate-400 font-medium">{filtered.length} parcels shown (newest {parcels.length})</p>
+            <PipelineBoard parcels={filtered} onOpen={setSelected} groupBy={groupBy} onChanged={reload} />
+          </>
+        )
       ) : (
         <ContainersView containers={containers} onOpen={setSelected} />
       )}
