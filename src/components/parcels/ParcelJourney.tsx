@@ -113,14 +113,15 @@ export default function ParcelJourney({ parcel, onClose, onChanged }: { parcel: 
         </div>
 
         {/* flags */}
-        {(parcel.flags.loadedNeverReceived || parcel.flags.needsPhone || parcel.flags.qtyMismatch || parcel.flags.partiallyArrived || parcel.flags.mixedUnits) && (
+        {(parcel.flags.loadedNeverReceived || parcel.flags.needsPhone || parcel.flags.qtyMismatch || parcel.flags.partiallyArrived || parcel.flags.partiallyLoaded || parcel.flags.mixedUnits) && (
           <div className="p-5 pb-0 space-y-2">
             {parcel.flags.loadedNeverReceived && (
               <Flag text="Loaded without an intake record — the goods-received sheet for its receiving date has not been uploaded. Received date recovered from the loading list." />
             )}
             {parcel.flags.needsPhone && <Flag text="No phone number on file — appears on the staff worklist." />}
-            {parcel.flags.qtyMismatch && <Flag text="Total quantity differs between intake and loading." />}
+            {parcel.flags.qtyMismatch && <Flag text="More has been loaded than the intake records account for — check the receiving sheets." />}
             {parcel.flags.partiallyArrived && <Flag tone="info" text="Some of this shipment's containers have arrived while others are still on the water — see the containers below." />}
+            {parcel.flags.partiallyLoaded && <Flag tone="info" text="Some received goods are still in the warehouse awaiting a container — the loaded quantity is less than what was received." />}
             {parcel.flags.mixedUnits && <Flag tone="info" text="This shipment mixes units (e.g. pallets and loose pieces); quantities are shown per unit rather than as one total." />}
           </div>
         )}
