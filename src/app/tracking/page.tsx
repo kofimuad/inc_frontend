@@ -541,7 +541,7 @@ function TrackingContent() {
 
                         return (
                           <tr
-                            key={`${r.trackingNumber}-${shippingMarkPhone || shippingMarkName || idx}`}
+                            key={`${r.trackingNumber}-${s?._id || shippingMarkPhone || shippingMarkName}-${idx}`}
                             className={`hover:bg-slate-50/60 transition-colors ${idx !== foundResults.length - 1 ? "border-b border-slate-50" : ""}`}
                           >
                             <td className="px-4 py-4 text-sm text-slate-700 min-w-40">
