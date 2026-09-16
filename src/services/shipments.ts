@@ -71,6 +71,74 @@ function parcelToShipment(p: any) {
     };
 }
 
+// A single tracking number for one customer can cover several distinct goods —
+// received on different days and/or loaded into different containers. Rather
+// than sum them into one row, expand a parcel into one display row per physical
+// line: one per goods-received receipt and one per container load. A normal
+// single good (≤1 receipt and ≤1 load) stays a single combined row that still
+// shows received → loaded → arrived together.
+function parcelToRows(p: any): any[] {
+    const intakeLines: any[] = (p.intake && p.intake.lines) || [];
+    const legs: any[] = (p.loading && p.loading.legs) || [];
+    if (intakeLines.length <= 1 && legs.length <= 1) return [parcelToShipment(p)];
+
+    const base = parcelToShipment(p);
+    const rows: any[] = [];
+
+    // Each row keeps the parcel's authoritative status (which already reflects
+    // any staff/manual override) — only the quantity, dates and container are
+    // split per physical line, so a staff-set status is never lost.
+    intakeLines.forEach((l, i) => {
+        rows.push({
+            ...base,
+            _id: `${p.waybill}|rcv|${i}`,
+            quantity: l.qty ?? null,
+            qtyByUnit: null,
+            intakeDate: l.date ?? p.receivedDate ?? null,
+            receivingDate: null,
+            loadingDate: null,
+            arrivalDate: null,
+            containerRef: null,
+            containerNo: null,
+            estimatedDelivery: null,
+            cbm: null,
+            containers: [],
+            partiallyArrived: false,
+            timeline: [{ status: 'in_warehouse', timestamp: l.date ?? null, location: p.intake?.warehouse ?? null, note: 'Received at the warehouse' }],
+            dates: { intakeDate: l.date ?? null, shippedAt: null, arrivedAt: null },
+            cargo: { cbm: null, description: p.productDescription ?? null },
+        });
+    });
+
+    legs.forEach((l, i) => {
+        const arrived = !!l.arrived;
+        rows.push({
+            ...base,
+            _id: `${p.waybill}|leg|${i}`,
+            quantity: l.qty ?? null,
+            qtyByUnit: null,
+            intakeDate: null,
+            receivingDate: l.loadingDate ?? null,
+            loadingDate: l.loadingDate ?? null,
+            arrivalDate: arrived ? (p.arrival?.date ?? null) : null,
+            containerRef: l.containerNo ?? null,
+            containerNo: l.containerNo ?? null,
+            estimatedDelivery: l.eta ?? null,
+            cbm: l.cbm ?? null,
+            containers: [{ containerNo: l.containerNo, loadingDate: l.loadingDate, eta: l.eta, qty: l.qty, arrived }],
+            partiallyArrived: false,
+            timeline: [
+                { status: 'shipped', timestamp: l.loadingDate ?? null, location: l.containerNo, note: 'Loaded into container' },
+                ...(arrived ? [{ status: 'arrived', timestamp: p.arrival?.date ?? null, location: l.containerNo, note: 'Arrived at the port' }] : []),
+            ],
+            dates: { intakeDate: null, shippedAt: l.loadingDate ?? null, arrivedAt: arrived ? (p.arrival?.date ?? null) : null },
+            cargo: { cbm: l.cbm ?? null, description: p.productDescription ?? null },
+        });
+    });
+
+    return rows;
+}
+
 // ═══════════════════════════════════════════════════
 // PUBLIC / CUSTOMER endpoints
 // ═══════════════════════════════════════════════════
@@ -127,7 +195,7 @@ export const getPublicTracking = async (
     return {
         ambiguous: false,
         total: d.total,
-        items: (d.parcels || []).map(parcelToShipment),
+        items: (d.parcels || []).flatMap(parcelToRows),
     };
 };
 
@@ -140,7 +208,7 @@ export const getPublicTracking = async (
  */
 export const getPublicTrackingByMark = async (mark: string) => {
     const { data: envelope } = await publicApi.get(`/api/v2/track/mark/${encodeURIComponent(mark)}`);
-    return { total: envelope.data.total, items: (envelope.data.parcels || []).map(parcelToShipment) };
+    return { total: envelope.data.total, items: (envelope.data.parcels || []).flatMap(parcelToRows) };
 };
 
 /**
@@ -150,7 +218,7 @@ export const getPublicTrackingByMark = async (mark: string) => {
  */
 export const getPublicTrackingByPhone = async (phone: string) => {
     const { data: envelope } = await publicApi.get(`/api/v2/track/phone/${encodeURIComponent(phone)}`);
-    const items = (envelope.data.parcels || []).map(parcelToShipment);
+    const items = (envelope.data.parcels || []).flatMap(parcelToRows);
     const grouped: Record<string, any[]> = {};
     for (const it of items) (grouped[it.status] = grouped[it.status] || []).push(it);
     return { total: envelope.data.total, grouped, items };
@@ -164,7 +232,7 @@ export const getMyShipments = async (
     _params: Record<string, any> = {},
 ): Promise<{ total: number; items: any[]; grouped?: Record<string, any[]> }> => {
     const { data: envelope } = await api.get('/api/v2/parcels/mine');
-    const items = (envelope.data.parcels || []).map(parcelToShipment);
+    const items = (envelope.data.parcels || []).flatMap(parcelToRows);
     return { total: envelope.data.total ?? items.length, items };
 };
 
