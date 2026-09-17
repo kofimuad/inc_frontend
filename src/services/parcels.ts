@@ -108,6 +108,13 @@ export async function getContainer(containerNo: string): Promise<{
   return data.data;
 }
 
+export interface UploadDuplicate {
+  exact: boolean;              // same bytes (true) vs same contents / re-saved copy (false)
+  fileHash: string;
+  originalFilename?: string | null;
+  uploadedAt?: string;
+}
+
 export interface UploadPreview {
   stage: Stage | null;
   headerWarnings: string[];
@@ -116,6 +123,7 @@ export interface UploadPreview {
   skippedRows: number;
   willLinkExisting: number;
   willCreateNew: number;
+  duplicateOf?: UploadDuplicate | null;
   sampleRows: { waybill: string; customerPhone: string | null; shippingMark: string | null; customerName: string | null; qty: number | null; receivedDate: string | null }[];
 }
 
@@ -135,10 +143,18 @@ export interface UploadResult {
   skippedRows: number[];
 }
 
-export async function uploadSheet(file: File): Promise<UploadResult> {
+/**
+ * Upload a sheet. By default a re-saved/renamed copy of an already-active sheet
+ * is rejected (409, `contentDuplicate`). Pass `replace` to revert that copy and
+ * take this one in its place, or `force` to keep both.
+ */
+export async function uploadSheet(file: File, opts: { force?: boolean; replace?: string } = {}): Promise<UploadResult> {
   const form = new FormData();
   form.append("file", file);
-  const { data } = await api.post("/api/v2/uploads", form, { headers: { "Content-Type": "multipart/form-data" } });
+  const params: Record<string, string> = {};
+  if (opts.force) params.force = "true";
+  if (opts.replace) params.replace = opts.replace;
+  const { data } = await api.post("/api/v2/uploads", form, { headers: { "Content-Type": "multipart/form-data" }, params });
   return data.data;
 }
 
