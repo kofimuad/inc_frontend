@@ -33,20 +33,27 @@ export default function UploadSheetModal({ onClose, onUploaded }: { onClose: () 
     } finally { setBusy(false); }
   };
 
-  const confirm = async () => {
+  const doUpload = async (opts: { force?: boolean; replace?: string } = {}) => {
     if (!file) return;
     setBusy(true); setError(null);
     try {
-      const r = await uploadSheet(file);
+      const r = await uploadSheet(file, opts);
       setDone(`${r.stage} sheet ingested — ${r.parcelsWritten} parcels updated`);
       onUploaded();
     } catch (e: unknown) {
-      const err = e as { response?: { status?: number; data?: { message?: string } } };
-      setError(err.response?.status === 409 ? "This exact file has already been uploaded." : (err.response?.data?.message || "Upload failed."));
+      const err = e as { response?: { status?: number; data?: { contentDuplicate?: boolean; message?: string } } };
+      if (err.response?.status === 409) {
+        setError(err.response.data?.message
+          || (err.response.data?.contentDuplicate ? "A sheet with the same contents is already uploaded." : "This exact file has already been uploaded."));
+      } else {
+        setError(err.response?.data?.message || "Upload failed.");
+      }
     } finally { setBusy(false); }
   };
 
   const meta = preview?.stage ? STAGE_META[preview.stage as Stage] : null;
+  const dup = preview?.duplicateOf ?? null;
+  const canConfirm = !!preview && !busy && !!preview.stage && preview.missingColumns.length === 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -89,6 +96,19 @@ export default function UploadSheetModal({ onClose, onUploaded }: { onClose: () 
             </div>
           )}
 
+          {dup && !done && (
+            <div className={`flex items-start gap-2 rounded-xl p-3 ring-1 text-sm ${dup.exact ? "bg-rose-50 text-rose-700 ring-rose-200" : "bg-amber-50 text-amber-800 ring-amber-200"}`}>
+              <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+              <div>
+                {dup.exact ? (
+                  <>This <b>exact file</b> is already uploaded{dup.originalFilename ? <> as <b>{dup.originalFilename}</b></> : ""} — there is nothing new to add.</>
+                ) : (
+                  <>This looks like a <b>re-upload</b> of {dup.originalFilename ? <b>{dup.originalFilename}</b> : "an existing sheet"}. Uploading it again creates a duplicate, and reverting one copy later won&apos;t remove the goods. <b>Replace</b> the existing one, or upload anyway if they are genuinely different.</>
+                )}
+              </div>
+            </div>
+          )}
+
           {preview && !done && !error && (
             <div className="border border-slate-100 rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -118,13 +138,30 @@ export default function UploadSheetModal({ onClose, onUploaded }: { onClose: () 
           ) : (
             <>
               <button onClick={onClose} className="px-4 py-2.5 rounded-xl text-slate-500 text-sm font-semibold hover:bg-slate-100">Cancel</button>
-              <button
-                onClick={confirm}
-                disabled={!preview || busy || !preview.stage || preview.missingColumns.length > 0}
-                className="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {busy ? <Loader2 size={15} className="animate-spin" /> : <UploadCloud size={15} />} Confirm upload
-              </button>
+              {dup && !dup.exact ? (
+                <>
+                  <button
+                    onClick={() => doUpload({ force: true })} disabled={!canConfirm}
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Upload anyway
+                  </button>
+                  <button
+                    onClick={() => doUpload({ replace: dup.fileHash })} disabled={!canConfirm}
+                    className="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {busy ? <Loader2 size={15} className="animate-spin" /> : <UploadCloud size={15} />} Replace existing
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => doUpload()}
+                  disabled={!canConfirm || !!(dup && dup.exact)}
+                  className="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {busy ? <Loader2 size={15} className="animate-spin" /> : <UploadCloud size={15} />} Confirm upload
+                </button>
+              )}
             </>
           )}
         </div>
